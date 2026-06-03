@@ -26,8 +26,8 @@ def main() -> None:
 
     result = analyze_portfolio_query_with_llm(query)
 
-    print("Phase 2B LLM Risk Agent Demo")
-    print("============================")
+    print("FinRisk Agent Demo")
+    print("==================")
     print(f"Original query: {result['original_query']}")
     print()
     print("Parsed portfolio:")
@@ -40,6 +40,10 @@ def main() -> None:
     print(f"95% historical VaR: {metrics['historical_var']:.2%}")
     print(f"95% Expected Shortfall: {metrics['expected_shortfall']:.2%}")
     print(f"Maximum drawdown: {metrics['max_drawdown']:.2%}")
+    print()
+    print("Retrieved Methodology Notes")
+    for doc in result["retrieved_methodology"]:
+        print(f"- {doc['title']}")
     print()
     print("LLM commentary:")
     print(result["commentary"])
