@@ -21,7 +21,7 @@ The project is designed to demonstrate practical financial risk analytics, clean
 
 ## Current Status
 
-The project currently includes the Python risk analytics backend, rule-based portfolio parsing, a minimal OpenAI-powered commentary agent, and simple local RAG over methodology notes. Streamlit, vector search, and formal tool-calling workflows are planned future improvements.
+The project currently includes the Python risk analytics backend, rule-based portfolio parsing, explicit agentic workflow orchestration, a minimal OpenAI-powered commentary agent, simple local RAG over methodology notes, and a Streamlit UI. Vector search and formal tool-calling workflows are planned future improvements.
 
 ## Architecture
 
@@ -35,40 +35,70 @@ User query
 
 At a high level, the rule-based parser extracts tickers and weights from plain English. The risk report engine downloads historical prices, calculates returns, and computes risk metrics. The local RAG layer retrieves relevant methodology notes from `docs/`. The LLM then generates commentary grounded in the calculated report and retrieved methodology snippets.
 
+## Agentic Workflow Orchestration
+
+FinRisk Agent now uses an explicit multi-step workflow that makes planning and execution traceable:
+
+```text
+natural-language query
+  -> portfolio parsing
+  -> input validation
+  -> risk metric calculation
+  -> methodology retrieval
+  -> commentary generation
+```
+
+The workflow layer records each step, status, and output summary, making the agent behavior easier to test, audit, and extend.
+
+### Tool Registry
+
+The workflow exposes deterministic risk analytics capabilities as registered tools. The current registry includes portfolio parsing, input validation, risk metric calculation, methodology retrieval, commentary generation, and report validation. This keeps tool availability explicit, documented, and inspectable without changing the underlying risk calculation logic.
+
+### Report Validation Gate
+
+After commentary generation, the workflow runs deterministic validation checks before accepting the final report. The validation gate checks risk metric sign conventions, Expected Shortfall versus VaR consistency, portfolio weight consistency, unsupported investment advice, assumptions and limitations, and methodology grounding against retrieved notes.
+
 ## Project Structure
 
 ```text
 Risk_Agent/
-├── docs/
-│   ├── concentration_risk.md
-│   ├── expected_shortfall.md
-│   ├── historical_var.md
-│   ├── max_drawdown.md
-│   └── model_limitations.md
-├── examples/
-│   ├── run_llm_agent_demo.py
-│   ├── run_phase1_demo.py
-│   └── run_text_query_demo.py
-├── src/
-│   ├── agent.py
-│   ├── market_data.py
-│   ├── portfolio.py
-│   ├── portfolio_parser.py
-│   ├── rag.py
-│   ├── risk_metrics.py
-│   ├── risk_report.py
-│   └── stress_testing.py
-├── tests/
-│   ├── test_agent.py
-│   ├── test_portfolio.py
-│   ├── test_portfolio_parser.py
-│   ├── test_rag.py
-│   ├── test_risk_metrics.py
-│   └── test_risk_report.py
-├── .env.example
-├── pytest.ini
-├── requirements.txt
-└── README.md
+|-- docs/
+|   |-- concentration_risk.md
+|   |-- expected_shortfall.md
+|   |-- historical_var.md
+|   |-- max_drawdown.md
+|   `-- model_limitations.md
+|-- examples/
+|   |-- run_llm_agent_demo.py
+|   |-- run_phase1_demo.py
+|   `-- run_text_query_demo.py
+|-- src/
+|   |-- agent.py
+|   |-- market_data.py
+|   |-- portfolio.py
+|   |-- portfolio_parser.py
+|   |-- rag.py
+|   |-- report_validator.py
+|   |-- risk_metrics.py
+|   |-- risk_report.py
+|   |-- stress_testing.py
+|   |-- tool_registry.py
+|   `-- workflow.py
+|-- tests/
+|   |-- test_agent.py
+|   |-- test_portfolio.py
+|   |-- test_portfolio_parser.py
+|   |-- test_rag.py
+|   |-- test_report_validator.py
+|   |-- test_risk_metrics.py
+|   |-- test_risk_report.py
+|   |-- test_tool_registry.py
+|   `-- test_workflow.py
+|-- app.py
+|-- .env.example
+|-- pytest.ini
+|-- requirements.txt
+`-- README.md
 ```
 
 ## Installation
@@ -160,7 +190,7 @@ The LLM commentary is instructed to cite only retrieved local methodology titles
 
 ## Future Improvements
 
-- Streamlit UI
+- Enhanced Streamlit workflow UI
 - Formal OpenAI tool/function calling workflow
 - Chroma or FAISS vector search
 - Factor exposure model
