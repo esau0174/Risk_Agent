@@ -197,6 +197,28 @@ def _generate_risk_commentary(
     return commentary
 
 
+def generate_risk_commentary(
+    query: str,
+    risk_report: dict,
+    methodology_docs: list[dict],
+    use_llm: bool = True,
+) -> str:
+    """Generate LLM commentary or a deterministic offline fallback."""
+    if use_llm:
+        load_dotenv()
+        client = _create_openai_client()
+        model = os.getenv("OPENAI_MODEL", DEFAULT_MODEL)
+        return _generate_risk_commentary(
+            client,
+            model,
+            query,
+            risk_report,
+            methodology_docs,
+        )
+
+    return _build_fallback_commentary(risk_report, methodology_docs)
+
+
 def _build_commentary_facts(
     risk_report: dict,
     methodology_docs: list[dict] | None = None,
@@ -293,3 +315,32 @@ def _normalize_weights(weights: Sequence[float]) -> list[float]:
         return [weight / 100 for weight in normalized]
 
     return normalized
+
+
+def _build_fallback_commentary(risk_report: dict, methodology_docs: list[dict]) -> str:
+    metadata = risk_report["metadata"]
+    metrics = risk_report["risk_metrics"]
+    tickers = metadata["tickers"]
+    weights = metadata["weights"]
+    largest_index = max(range(len(weights)), key=weights.__getitem__)
+    methodology_titles = [doc["title"] for doc in methodology_docs]
+
+    references = ""
+    if methodology_titles:
+        references = " Methodology references: " + ", ".join(methodology_titles) + "."
+
+    return (
+        f"The workflow analyzed {', '.join(tickers)} using historical data since "
+        f"{metadata['start_date']}. Annualized volatility is "
+        f"{metrics['annualized_volatility']:.2%}, 95% historical VaR is "
+        f"{metrics['historical_var']:.2%}. Based on the historical daily return "
+        "distribution, losses exceeded this threshold in approximately the worst 5% "
+        "of observations in the lookback window. Expected Shortfall is "
+        f"{metrics['expected_shortfall']:.2%}; it estimates the average loss conditional "
+        "on losses exceeding the VaR threshold. Maximum drawdown is "
+        f"{metrics['max_drawdown']:.2%}. The largest single position is "
+        f"{tickers[largest_index]} at {weights[largest_index]:.2%}. Assumptions and "
+        "limitations: this fallback commentary is based only on calculated metrics, "
+        "historical data, and local methodology retrieval; it is not investment advice."
+        f"{references}"
+    )

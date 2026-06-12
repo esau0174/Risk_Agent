@@ -1,22 +1,14 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 
-from dotenv import load_dotenv
-
 from src.agent import (
-    DEFAULT_MODEL,
     DEFAULT_START_DATE,
     _build_methodology_query,
-    _create_openai_client,
-    _generate_risk_commentary,
 )
-from src.portfolio import validate_weights
-from src.portfolio_parser import parse_portfolio_text
-from src.rag import load_methodology_docs, retrieve_relevant_methodology
-from src.report_validator import ValidationResult, validate_generated_report
-from src.risk_report import generate_portfolio_risk_report
+from src.rag import load_methodology_docs
+from src.report_validator import ValidationResult
+from src.tool_executor import ToolExecutor, ToolResult
 from src.tool_registry import get_tool
 
 
@@ -95,12 +87,19 @@ def build_risk_workflow_plan(query: str) -> WorkflowPlan:
     )
 
 
-def run_risk_workflow(query: str, use_llm: bool = True) -> WorkflowResult:
+def run_risk_workflow(
+    query: str,
+    use_llm: bool = True,
+    tool_executor: ToolExecutor | None = None,
+) -> WorkflowResult:
     """Run the deterministic multi-step risk workflow."""
     plan = build_risk_workflow_plan(query)
     warnings: list[str] = []
+    executor = tool_executor or ToolExecutor()
 
-    parsed_portfolio = parse_portfolio_text(query)
+    parsed_portfolio = _require_tool_output(
+        executor.execute("parse_portfolio", query)
+    )
     _complete_step(
         plan,
         "parse_portfolio",
@@ -111,7 +110,14 @@ def run_risk_workflow(query: str, use_llm: bool = True) -> WorkflowResult:
     )
 
     tickers = parsed_portfolio["tickers"]
-    weights = validate_weights(tickers, parsed_portfolio["weights"]).tolist()
+    validated_weights = _require_tool_output(
+        executor.execute(
+            "validate_portfolio",
+            tickers,
+            parsed_portfolio["weights"],
+        )
+    )
+    weights = validated_weights.tolist()
     parsed_portfolio = {"tickers": tickers, "weights": weights}
     _complete_step(
         plan,
@@ -119,10 +125,13 @@ def run_risk_workflow(query: str, use_llm: bool = True) -> WorkflowResult:
         f"Validated {len(tickers)} holdings; weights sum to 1.0.",
     )
 
-    risk_report = generate_portfolio_risk_report(
-        tickers,
-        weights,
-        start_date=DEFAULT_START_DATE,
+    risk_report = _require_tool_output(
+        executor.execute(
+            "calculate_risk_metrics",
+            tickers,
+            weights,
+            start_date=DEFAULT_START_DATE,
+        )
     )
     metric_names = ", ".join(risk_report["risk_metrics"].keys())
     _complete_step(
@@ -133,10 +142,13 @@ def run_risk_workflow(query: str, use_llm: bool = True) -> WorkflowResult:
 
     docs = load_methodology_docs()
     methodology_query = _build_methodology_query(query, risk_report)
-    methodology_notes = retrieve_relevant_methodology(
-        methodology_query,
-        docs,
-        top_k=4,
+    methodology_notes = _require_tool_output(
+        executor.execute(
+            "retrieve_methodology",
+            methodology_query,
+            docs,
+            top_k=4,
+        )
     )
     methodology_titles = [doc["title"] for doc in methodology_notes]
     _complete_step(
@@ -145,30 +157,31 @@ def run_risk_workflow(query: str, use_llm: bool = True) -> WorkflowResult:
         f"Retrieved methodology notes: {methodology_titles}.",
     )
 
-    if use_llm:
-        load_dotenv()
-        client = _create_openai_client()
-        model = os.getenv("OPENAI_MODEL", DEFAULT_MODEL)
-        commentary = _generate_risk_commentary(
-            client,
-            model,
+    commentary = _require_tool_output(
+        executor.execute(
+            "generate_commentary",
             query,
             risk_report,
             methodology_notes,
+            use_llm=use_llm,
         )
+    )
+    if use_llm:
         commentary_summary = "Generated LLM commentary from calculated facts and retrieved methodology."
     else:
-        commentary = _build_fallback_commentary(risk_report, methodology_notes)
         warnings.append("LLM commentary disabled; returned deterministic fallback commentary.")
         commentary_summary = "Generated deterministic fallback commentary without calling the LLM."
 
     _complete_step(plan, "generate_commentary", commentary_summary)
 
-    validation_result = validate_generated_report(
-        parsed_portfolio,
-        risk_report,
-        methodology_notes,
-        commentary,
+    validation_result = _require_tool_output(
+        executor.execute(
+            "validate_report",
+            parsed_portfolio,
+            risk_report,
+            methodology_notes,
+            commentary,
+        )
     )
     warnings.extend(validation_result.warnings)
     validation_status = "passed" if validation_result.passed else "failed"
@@ -204,30 +217,8 @@ def _complete_step(plan: WorkflowPlan, step_name: str, output_summary: str) -> N
     raise ValueError(f"Workflow step not found: {step_name}")
 
 
-def _build_fallback_commentary(risk_report: dict, methodology_notes: list[dict]) -> str:
-    metadata = risk_report["metadata"]
-    metrics = risk_report["risk_metrics"]
-    tickers = metadata["tickers"]
-    weights = metadata["weights"]
-    largest_index = max(range(len(weights)), key=weights.__getitem__)
-    methodology_titles = [doc["title"] for doc in methodology_notes]
+def _require_tool_output(result: ToolResult):
+    if result.status != "success":
+        raise RuntimeError(f"Tool '{result.tool_name}' failed: {result.error}")
 
-    references = ""
-    if methodology_titles:
-        references = " Methodology references: " + ", ".join(methodology_titles) + "."
-
-    return (
-        f"The workflow analyzed {', '.join(tickers)} using historical data since "
-        f"{metadata['start_date']}. Annualized volatility is "
-        f"{metrics['annualized_volatility']:.2%}, 95% historical VaR is "
-        f"{metrics['historical_var']:.2%}. Based on the historical daily return "
-        "distribution, losses exceeded this threshold in approximately the worst 5% "
-        "of observations in the lookback window. Expected Shortfall is "
-        f"{metrics['expected_shortfall']:.2%}; it estimates the average loss conditional "
-        "on losses exceeding the VaR threshold. Maximum drawdown is "
-        f"{metrics['max_drawdown']:.2%}. The largest single position is "
-        f"{tickers[largest_index]} at {weights[largest_index]:.2%}. Assumptions and "
-        "limitations: this fallback commentary is based only on calculated metrics, "
-        "historical data, and local methodology retrieval; it is not investment advice."
-        f"{references}"
-    )
+    return result.output

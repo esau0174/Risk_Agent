@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
+from src.tool_executor import ToolExecutor
+from src.tool_registry import list_registered_tools
 from src.workflow import WorkflowResult, build_risk_workflow_plan, run_risk_workflow
 
 
@@ -26,7 +30,7 @@ def test_build_risk_workflow_plan_returns_expected_steps():
     assert all(step.status == "pending" for step in plan.steps)
 
 
-def test_run_risk_workflow_without_llm_returns_completed_result(monkeypatch):
+def test_run_risk_workflow_without_llm_returns_completed_result():
     def fake_generate_portfolio_risk_report(
         tickers,
         weights,
@@ -57,12 +61,19 @@ def test_run_risk_workflow_without_llm_returns_completed_result(monkeypatch):
             "analysis_timestamp": "2026-01-01T00:00:00+00:00",
         }
 
-    monkeypatch.setattr(
-        "src.workflow.generate_portfolio_risk_report",
-        fake_generate_portfolio_risk_report,
-    )
+    tools = [
+        replace(tool, callable=fake_generate_portfolio_risk_report)
+        if tool.name == "calculate_risk_metrics"
+        else tool
+        for tool in list_registered_tools()
+    ]
+    executor = ToolExecutor(tools)
 
-    result = run_risk_workflow("40% SPY, 60% QQQ", use_llm=False)
+    result = run_risk_workflow(
+        "40% SPY, 60% QQQ",
+        use_llm=False,
+        tool_executor=executor,
+    )
 
     assert isinstance(result, WorkflowResult)
     assert all(step.status == "completed" for step in result.plan.steps)
