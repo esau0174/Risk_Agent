@@ -4,7 +4,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from src.agent import generate_risk_commentary
+from src.agent import (
+    generate_risk_commentary,
+    regenerate_risk_commentary_with_validation_errors,
+)
 from src.portfolio import validate_weights
 from src.portfolio_parser import parse_portfolio_text
 from src.rag import retrieve_relevant_methodology
@@ -50,6 +53,12 @@ _REGISTERED_TOOLS: tuple[RiskTool, ...] = (
         description="Generate analyst-style commentary from calculated risk facts and methodology notes.",
         callable_name="src.agent.generate_risk_commentary",
         handler=generate_risk_commentary,
+    ),
+    RiskTool(
+        name="regenerate_commentary_with_validation_errors",
+        description="Regenerate risk commentary once using report validation errors and warnings.",
+        callable_name="src.agent.regenerate_risk_commentary_with_validation_errors",
+        handler=regenerate_risk_commentary_with_validation_errors,
     ),
     RiskTool(
         name="validate_report",

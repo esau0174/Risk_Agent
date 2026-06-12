@@ -219,6 +219,58 @@ def generate_risk_commentary(
     return _build_fallback_commentary(risk_report, methodology_docs)
 
 
+def regenerate_risk_commentary_with_validation_errors(
+    risk_report: dict,
+    original_commentary: str,
+    validation_errors: list[str],
+    validation_warnings: list[str],
+    methodology_docs: list[dict],
+    use_llm: bool = True,
+) -> str:
+    """Regenerate commentary once using deterministic validation feedback."""
+    if not use_llm:
+        return _build_fallback_commentary(risk_report, methodology_docs)
+
+    load_dotenv()
+    client = _create_openai_client()
+    model = os.getenv("OPENAI_MODEL", DEFAULT_MODEL)
+    facts = _build_commentary_facts(risk_report, methodology_docs)
+    response = client.responses.create(
+        model=model,
+        input=[
+            {
+                "role": "system",
+                "content": (
+                    "Revise the supplied portfolio risk commentary so it resolves every "
+                    "validation error and warning. Use only the supplied calculated facts and "
+                    "retrieved methodology notes. Do not invent metrics or citations, make "
+                    "investment recommendations, or claim guaranteed outcomes. Preserve clear "
+                    "assumptions, limitations, and the not-investment-advice disclaimer."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Calculated report facts:\n{json.dumps(facts, indent=2)}\n\n"
+                    f"Original commentary:\n{original_commentary}\n\n"
+                    f"Validation errors:\n{json.dumps(validation_errors, indent=2)}\n\n"
+                    f"Validation warnings:\n{json.dumps(validation_warnings, indent=2)}"
+                ),
+            },
+        ],
+    )
+
+    try:
+        commentary = response.output_text.strip()
+    except AttributeError as exc:
+        raise ValueError("LLM did not return regenerated commentary text.") from exc
+
+    if not commentary:
+        raise ValueError("LLM returned empty regenerated commentary.")
+
+    return commentary
+
+
 def _build_commentary_facts(
     risk_report: dict,
     methodology_docs: list[dict] | None = None,

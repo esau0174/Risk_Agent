@@ -35,6 +35,25 @@ _METHODOLOGY_REFERENCE_PATTERN = re.compile(
     r"Methodology references?:\s*([^\n.]+)",
     re.I,
 )
+_PERCENTAGE_PATTERN = re.compile(r"(?P<value>\d+(?:\.\d+)?)\s*%")
+_METRIC_LABELS = {
+    "annualized_volatility": (
+        "Annualized volatility",
+        (r"annuali[sz]ed\s+volatility",),
+    ),
+    "historical_var": (
+        "Historical VaR",
+        (r"historical\s+var", r"95%\s+var", r"\bvar\b"),
+    ),
+    "expected_shortfall": (
+        "Expected Shortfall",
+        (r"expected\s+shortfall", r"\bes\b"),
+    ),
+    "max_drawdown": (
+        "Maximum drawdown",
+        (r"maximum\s+drawdown", r"max(?:imum)?\s+drawdown"),
+    ),
+}
 
 
 def validate_generated_report(
@@ -42,6 +61,7 @@ def validate_generated_report(
     risk_report,
     methodology_notes,
     commentary: str,
+    percentage_tolerance: float = 0.10,
 ) -> ValidationResult:
     """Validate calculated risk outputs and generated commentary guardrails."""
     checks: list[ValidationCheck] = []
@@ -100,6 +120,24 @@ def validate_generated_report(
     )
 
     commentary_text = commentary or ""
+    consistency_errors = _commentary_metric_consistency_errors(
+        commentary_text,
+        risk_metrics,
+        percentage_tolerance,
+    )
+    checks.append(
+        ValidationCheck(
+            name="commentary_metric_consistency",
+            passed=not consistency_errors,
+            message=(
+                "Commentary percentage figures are consistent with calculated risk metrics."
+                if not consistency_errors
+                else "Commentary contains percentage figures inconsistent with calculated risk metrics."
+            ),
+        )
+    )
+    errors.extend(consistency_errors)
+
     _run_check(
         checks,
         errors,
@@ -199,6 +237,93 @@ def _is_positive_number(value: Any) -> bool:
 
 def _contains_direct_recommendation(commentary: str) -> bool:
     return any(pattern.search(commentary) for pattern in _RECOMMENDATION_PATTERNS)
+
+
+def _commentary_metric_consistency_errors(
+    commentary: str,
+    risk_metrics,
+    tolerance: float,
+) -> list[str]:
+    if tolerance < 0:
+        raise ValueError("Percentage tolerance must be non-negative.")
+
+    errors = []
+    for metric_key, (display_name, label_patterns) in _METRIC_LABELS.items():
+        expected_metric = _get(risk_metrics, metric_key)
+        if not _is_number(expected_metric):
+            continue
+
+        expected_percentage = float(expected_metric) * 100
+        found_values = _extract_labeled_percentages(commentary, label_patterns)
+        for found_percentage in found_values:
+            if abs(found_percentage - expected_percentage) > tolerance:
+                errors.append(
+                    f"{display_name} percentage mismatch: expected "
+                    f"{expected_percentage:.2f}%, found {found_percentage:.2f}%."
+                )
+
+    return errors
+
+
+def _extract_labeled_percentages(
+    commentary: str,
+    label_patterns: tuple[str, ...],
+) -> list[float]:
+    values: list[float] = []
+    seen_spans: set[tuple[int, int]] = set()
+
+    for label_pattern in label_patterns:
+        for label_match in re.finditer(label_pattern, commentary, re.I):
+            before = commentary[max(0, label_match.start() - 20) : label_match.start()]
+            before_matches = list(_PERCENTAGE_PATTERN.finditer(before))
+            if before_matches:
+                percentage_match = before_matches[-1]
+                gap = before[percentage_match.end() :]
+                percentage_value = float(percentage_match.group("value"))
+                is_confidence_label = (
+                    percentage_value in {90.0, 95.0, 99.0}
+                    and any("var" in pattern.lower() for pattern in label_patterns)
+                )
+                if re.fullmatch(r"\s*", gap) and not is_confidence_label:
+                    span = (
+                        label_match.start() - len(before) + percentage_match.start(),
+                        label_match.start() - len(before) + percentage_match.end(),
+                    )
+                    if span not in seen_spans:
+                        values.append(percentage_value)
+                        seen_spans.add(span)
+                        continue
+
+            after = commentary[label_match.end() : label_match.end() + 100]
+            for percentage_match in _PERCENTAGE_PATTERN.finditer(after):
+                suffix = after[percentage_match.end() : percentage_match.end() + 20]
+                if re.match(r"\s*(?:confidence|level)", suffix, re.I):
+                    continue
+
+                prefix = after[: percentage_match.start()]
+                if _contains_other_metric_label(prefix, label_patterns):
+                    break
+
+                span = (
+                    label_match.end() + percentage_match.start(),
+                    label_match.end() + percentage_match.end(),
+                )
+                if span not in seen_spans:
+                    values.append(float(percentage_match.group("value")))
+                    seen_spans.add(span)
+                break
+
+    return values
+
+
+def _contains_other_metric_label(text: str, current_patterns: tuple[str, ...]) -> bool:
+    for _, label_patterns in _METRIC_LABELS.values():
+        if label_patterns == current_patterns:
+            continue
+        if any(re.search(pattern, text, re.I) for pattern in label_patterns):
+            return True
+
+    return False
 
 
 def _contains_assumptions_or_limitations(commentary: str) -> bool:

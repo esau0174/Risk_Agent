@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any
 
 from src.agent import (
@@ -27,6 +28,13 @@ class WorkflowStep:
 class WorkflowPlan:
     objective: str
     steps: list[WorkflowStep]
+
+
+class Intent(str, Enum):
+    PORTFOLIO_RISK = "portfolio_risk"
+    METHODOLOGY_EXPLANATION = "methodology_explanation"
+    STRESS_TEST = "stress_test"
+    REPORT_VALIDATION = "report_validation"
 
 
 @dataclass
@@ -57,46 +65,80 @@ def build_risk_workflow_plan(query: str) -> WorkflowPlan:
     if not isinstance(query, str) or not query.strip():
         raise ValueError("Query must be a non-empty string.")
 
+    return build_workflow_plan_for_intent(Intent.PORTFOLIO_RISK)
+
+
+def classify_intent(user_query: str) -> Intent:
+    """Classify a user query with deterministic keyword rules."""
+    if not isinstance(user_query, str) or not user_query.strip():
+        raise ValueError("User query must be a non-empty string.")
+
+    normalized_query = " ".join(user_query.lower().split())
+
+    if any(keyword in normalized_query for keyword in ("stress", "shock", "scenario", "selloff")):
+        return Intent.STRESS_TEST
+
+    if any(
+        phrase in normalized_query
+        for phrase in ("methodology", "explain", "how is", "how are", "definition")
+    ):
+        return Intent.METHODOLOGY_EXPLANATION
+
+    if any(
+        phrase in normalized_query
+        for phrase in ("validate", "check report", "review report")
+    ):
+        return Intent.REPORT_VALIDATION
+
+    return Intent.PORTFOLIO_RISK
+
+
+def build_workflow_plan_for_intent(intent: Intent) -> WorkflowPlan:
+    """Build a deterministic plan for an already-classified intent."""
+    if not isinstance(intent, Intent):
+        raise ValueError("Intent must be an Intent enum value.")
+
+    if intent is Intent.PORTFOLIO_RISK:
+        return WorkflowPlan(
+            objective="Analyze portfolio risk from a natural-language query.",
+            steps=[
+                _registered_step("parse_portfolio"),
+                _registered_step("validate_portfolio"),
+                _registered_step("calculate_risk_metrics"),
+                _registered_step("retrieve_methodology"),
+                _registered_step("generate_commentary"),
+                _registered_step("validate_report"),
+            ],
+        )
+
+    if intent is Intent.METHODOLOGY_EXPLANATION:
+        return WorkflowPlan(
+            objective="Explain financial risk methodology using local reference notes.",
+            steps=[
+                _registered_step("retrieve_methodology"),
+                _registered_step("generate_commentary"),
+            ],
+        )
+
+    if intent is Intent.STRESS_TEST:
+        return WorkflowPlan(
+            objective="Plan a portfolio stress-test analysis.",
+            steps=[
+                WorkflowStep(
+                    name="stress_test",
+                    description=(
+                        "Placeholder for a future stress-test workflow; no stress tool is "
+                        "registered or executed yet."
+                    ),
+                    status="pending",
+                    tool_name="stress_test",
+                )
+            ],
+        )
+
     return WorkflowPlan(
-        objective="Analyze portfolio risk from a natural-language query.",
-        steps=[
-            WorkflowStep(
-                name="parse_portfolio",
-                description=get_tool("parse_portfolio").description,
-                status="pending",
-                tool_name=get_tool("parse_portfolio").name,
-            ),
-            WorkflowStep(
-                name="validate_portfolio",
-                description=get_tool("validate_portfolio").description,
-                status="pending",
-                tool_name=get_tool("validate_portfolio").name,
-            ),
-            WorkflowStep(
-                name="calculate_risk_metrics",
-                description=get_tool("calculate_risk_metrics").description,
-                status="pending",
-                tool_name=get_tool("calculate_risk_metrics").name,
-            ),
-            WorkflowStep(
-                name="retrieve_methodology",
-                description=get_tool("retrieve_methodology").description,
-                status="pending",
-                tool_name=get_tool("retrieve_methodology").name,
-            ),
-            WorkflowStep(
-                name="generate_commentary",
-                description=get_tool("generate_commentary").description,
-                status="pending",
-                tool_name=get_tool("generate_commentary").name,
-            ),
-            WorkflowStep(
-                name="validate_report",
-                description=get_tool("validate_report").description,
-                status="pending",
-                tool_name=get_tool("validate_report").name,
-            ),
-        ],
+        objective="Validate an existing generated risk report.",
+        steps=[_registered_step("validate_report")],
     )
 
 
@@ -225,6 +267,46 @@ def run_risk_workflow(
         methodology_notes,
         commentary,
     )
+
+    if not validation_result.passed:
+        initial_errors = list(validation_result.errors)
+        initial_warnings = list(validation_result.warnings)
+        commentary = _execute_traced(
+            executor,
+            execution_trace,
+            "regenerate_commentary_with_validation_errors",
+            (
+                f"Original commentary with {len(initial_errors)} validation errors and "
+                f"{len(initial_warnings)} warnings."
+            ),
+            lambda output: (
+                f"Regenerated commentary with {len(output)} characters."
+            ),
+            risk_report,
+            commentary,
+            initial_errors,
+            initial_warnings,
+            methodology_notes,
+            use_llm=use_llm,
+        )
+        warnings.append(
+            "Initial commentary failed validation; commentary was regenerated once."
+        )
+        validation_result = _execute_traced(
+            executor,
+            execution_trace,
+            "validate_report",
+            "Regenerated commentary and original analytical report inputs.",
+            lambda output: (
+                f"Validation {'passed' if output.passed else 'failed'} with "
+                f"{len(output.errors)} errors and {len(output.warnings)} warnings."
+            ),
+            parsed_portfolio,
+            risk_report,
+            methodology_notes,
+            commentary,
+        )
+
     warnings.extend(validation_result.warnings)
     validation_status = "passed" if validation_result.passed else "failed"
     _complete_step(
@@ -258,6 +340,16 @@ def _complete_step(plan: WorkflowPlan, step_name: str, output_summary: str) -> N
             return
 
     raise ValueError(f"Workflow step not found: {step_name}")
+
+
+def _registered_step(tool_name: str) -> WorkflowStep:
+    tool = get_tool(tool_name)
+    return WorkflowStep(
+        name=tool.name,
+        description=tool.description,
+        status="pending",
+        tool_name=tool.name,
+    )
 
 
 def _execute_traced(

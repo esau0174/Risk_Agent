@@ -9,6 +9,7 @@ EXPECTED_TOOL_NAMES = [
     "calculate_risk_metrics",
     "retrieve_methodology",
     "generate_commentary",
+    "regenerate_commentary_with_validation_errors",
     "validate_report",
 ]
 

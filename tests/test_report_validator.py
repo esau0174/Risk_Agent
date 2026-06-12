@@ -10,6 +10,7 @@ def _valid_parsed_portfolio() -> dict:
 def _valid_risk_report() -> dict:
     return {
         "risk_metrics": {
+            "annualized_volatility": 0.20,
             "historical_var": 0.02,
             "expected_shortfall": 0.03,
             "max_drawdown": 0.15,
@@ -156,6 +157,96 @@ def test_negated_guarantee_disclaimer_does_not_fail_certainty_check():
         _valid_risk_report(),
         _valid_methodology_notes(),
         commentary,
+    )
+
+    assert result.passed is True
+
+
+def test_matching_commentary_metric_percentages_pass():
+    commentary = (
+        "Annualized volatility is 20.00%. Historical VaR is 2.00%. "
+        "Expected Shortfall is 3.00%, and maximum drawdown is 15.00%. "
+        "Assumptions and limitations: historical data only; not investment advice."
+    )
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        commentary,
+    )
+
+    assert result.passed is True
+
+
+def test_mismatched_var_percentage_fails():
+    commentary = (
+        "95% historical VaR is 4.50%. Assumptions and limitations: historical data "
+        "only; not investment advice."
+    )
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        commentary,
+    )
+
+    assert result.passed is False
+    assert any(
+        "Historical VaR percentage mismatch: expected 2.00%, found 4.50%." in error
+        for error in result.errors
+    )
+
+
+def test_mismatched_expected_shortfall_percentage_fails():
+    commentary = (
+        "Expected Shortfall is 5.00%. Assumptions and limitations: historical data "
+        "only; not investment advice."
+    )
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        commentary,
+    )
+
+    assert result.passed is False
+    assert any(
+        "Expected Shortfall percentage mismatch: expected 3.00%, found 5.00%." in error
+        for error in result.errors
+    )
+
+
+def test_unrelated_percentages_do_not_fail_metric_consistency():
+    commentary = (
+        "SPY has a 40% portfolio weight. Assumptions and limitations: historical data "
+        "only; not investment advice."
+    )
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        commentary,
+    )
+
+    assert result.passed is True
+
+
+def test_metric_percentage_within_tolerance_passes():
+    commentary = (
+        "Historical VaR is 2.08%. Assumptions and limitations: historical data only; "
+        "not investment advice."
+    )
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        commentary,
+        percentage_tolerance=0.10,
     )
 
     assert result.passed is True
