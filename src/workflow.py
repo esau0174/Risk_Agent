@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from src.agent import (
     DEFAULT_START_DATE,
@@ -28,9 +30,20 @@ class WorkflowPlan:
 
 
 @dataclass
+class ExecutionTraceEntry:
+    step_number: int
+    tool_name: str
+    status: str
+    input_summary: str
+    output_summary: str
+    error: str | None
+
+
+@dataclass
 class WorkflowResult:
     query: str
     plan: WorkflowPlan
+    execution_trace: list[ExecutionTraceEntry]
     parsed_portfolio: dict
     risk_report: dict
     methodology_notes: list[dict]
@@ -95,10 +108,18 @@ def run_risk_workflow(
     """Run the deterministic multi-step risk workflow."""
     plan = build_risk_workflow_plan(query)
     warnings: list[str] = []
+    execution_trace: list[ExecutionTraceEntry] = []
     executor = tool_executor or ToolExecutor()
 
-    parsed_portfolio = _require_tool_output(
-        executor.execute("parse_portfolio", query)
+    parsed_portfolio = _execute_traced(
+        executor,
+        execution_trace,
+        "parse_portfolio",
+        "Natural-language portfolio query.",
+        lambda output: (
+            f"Parsed {len(output['tickers'])} holdings: {output['tickers']}."
+        ),
+        query,
     )
     _complete_step(
         plan,
@@ -110,12 +131,16 @@ def run_risk_workflow(
     )
 
     tickers = parsed_portfolio["tickers"]
-    validated_weights = _require_tool_output(
-        executor.execute(
-            "validate_portfolio",
-            tickers,
-            parsed_portfolio["weights"],
-        )
+    validated_weights = _execute_traced(
+        executor,
+        execution_trace,
+        "validate_portfolio",
+        f"{len(tickers)} tickers and portfolio weights.",
+        lambda output: (
+            f"Validated {len(output)} weights with total {output.sum():.6f}."
+        ),
+        tickers,
+        parsed_portfolio["weights"],
     )
     weights = validated_weights.tolist()
     parsed_portfolio = {"tickers": tickers, "weights": weights}
@@ -125,13 +150,19 @@ def run_risk_workflow(
         f"Validated {len(tickers)} holdings; weights sum to 1.0.",
     )
 
-    risk_report = _require_tool_output(
-        executor.execute(
-            "calculate_risk_metrics",
-            tickers,
-            weights,
-            start_date=DEFAULT_START_DATE,
-        )
+    risk_report = _execute_traced(
+        executor,
+        execution_trace,
+        "calculate_risk_metrics",
+        (
+            f"Portfolio with {len(tickers)} holdings from {DEFAULT_START_DATE}."
+        ),
+        lambda output: (
+            "Calculated metrics: " + ", ".join(output["risk_metrics"].keys()) + "."
+        ),
+        tickers,
+        weights,
+        start_date=DEFAULT_START_DATE,
     )
     metric_names = ", ".join(risk_report["risk_metrics"].keys())
     _complete_step(
@@ -142,13 +173,17 @@ def run_risk_workflow(
 
     docs = load_methodology_docs()
     methodology_query = _build_methodology_query(query, risk_report)
-    methodology_notes = _require_tool_output(
-        executor.execute(
-            "retrieve_methodology",
-            methodology_query,
-            docs,
-            top_k=4,
-        )
+    methodology_notes = _execute_traced(
+        executor,
+        execution_trace,
+        "retrieve_methodology",
+        f"Methodology query across {len(docs)} local documents.",
+        lambda output: (
+            f"Retrieved {len(output)} notes: {[doc['title'] for doc in output]}."
+        ),
+        methodology_query,
+        docs,
+        top_k=4,
     )
     methodology_titles = [doc["title"] for doc in methodology_notes]
     _complete_step(
@@ -157,14 +192,21 @@ def run_risk_workflow(
         f"Retrieved methodology notes: {methodology_titles}.",
     )
 
-    commentary = _require_tool_output(
-        executor.execute(
-            "generate_commentary",
-            query,
-            risk_report,
-            methodology_notes,
-            use_llm=use_llm,
-        )
+    commentary = _execute_traced(
+        executor,
+        execution_trace,
+        "generate_commentary",
+        (
+            f"Calculated risk report and {len(methodology_notes)} methodology notes; "
+            f"LLM enabled: {use_llm}."
+        ),
+        lambda output: (
+            f"Generated commentary with {len(output)} characters."
+        ),
+        query,
+        risk_report,
+        methodology_notes,
+        use_llm=use_llm,
     )
     if use_llm:
         commentary_summary = "Generated LLM commentary from calculated facts and retrieved methodology."
@@ -174,14 +216,19 @@ def run_risk_workflow(
 
     _complete_step(plan, "generate_commentary", commentary_summary)
 
-    validation_result = _require_tool_output(
-        executor.execute(
-            "validate_report",
-            parsed_portfolio,
-            risk_report,
-            methodology_notes,
-            commentary,
-        )
+    validation_result = _execute_traced(
+        executor,
+        execution_trace,
+        "validate_report",
+        "Parsed portfolio, risk report, methodology notes, and commentary.",
+        lambda output: (
+            f"Validation {'passed' if output.passed else 'failed'} with "
+            f"{len(output.errors)} errors and {len(output.warnings)} warnings."
+        ),
+        parsed_portfolio,
+        risk_report,
+        methodology_notes,
+        commentary,
     )
     warnings.extend(validation_result.warnings)
     validation_status = "passed" if validation_result.passed else "failed"
@@ -198,6 +245,7 @@ def run_risk_workflow(
     return WorkflowResult(
         query=query,
         plan=plan,
+        execution_trace=execution_trace,
         parsed_portfolio=parsed_portfolio,
         risk_report=risk_report,
         methodology_notes=methodology_notes,
@@ -222,3 +270,31 @@ def _require_tool_output(result: ToolResult):
         raise RuntimeError(f"Tool '{result.tool_name}' failed: {result.error}")
 
     return result.output
+
+
+def _execute_traced(
+    executor: ToolExecutor,
+    execution_trace: list[ExecutionTraceEntry],
+    tool_name: str,
+    input_summary: str,
+    output_summary_builder: Callable[[Any], str],
+    *args,
+    **kwargs,
+):
+    result = executor.execute(tool_name, *args, **kwargs)
+    output_summary = (
+        output_summary_builder(result.output)
+        if result.status == "success"
+        else "Tool execution produced no output."
+    )
+    execution_trace.append(
+        ExecutionTraceEntry(
+            step_number=len(execution_trace) + 1,
+            tool_name=tool_name,
+            status=result.status,
+            input_summary=input_summary,
+            output_summary=output_summary,
+            error=result.error,
+        )
+    )
+    return _require_tool_output(result)

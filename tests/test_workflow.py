@@ -87,6 +87,19 @@ def test_run_risk_workflow_without_llm_returns_completed_result():
     assert "not investment advice" in result.llm_commentary
     assert result.validation_result.passed is True
     assert any(step.name == "validate_report" for step in result.plan.steps)
+    assert [entry.tool_name for entry in result.execution_trace] == [
+        "parse_portfolio",
+        "validate_portfolio",
+        "calculate_risk_metrics",
+        "retrieve_methodology",
+        "generate_commentary",
+        "validate_report",
+    ]
+    assert [entry.step_number for entry in result.execution_trace] == [1, 2, 3, 4, 5, 6]
+    assert all(entry.status == "success" for entry in result.execution_trace)
+    assert all(entry.input_summary for entry in result.execution_trace)
+    assert all(entry.output_summary for entry in result.execution_trace)
+    assert all(entry.error is None for entry in result.execution_trace)
     assert result.warnings == [
         "LLM commentary disabled; returned deterministic fallback commentary."
     ]
