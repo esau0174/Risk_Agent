@@ -22,8 +22,17 @@ class ValidationResult:
 
 
 _RECOMMENDATION_PATTERNS = (
-    re.compile(r"\b(you should|recommend(?:ed|s)?|must|need to)\s+(buy|sell|hold)\b", re.I),
-    re.compile(r"\b(buy|sell|hold)\s+[A-Z]{1,10}\b", re.I),
+    re.compile(r"\b(?:buy|sell|hold)\s+[A-Z][A-Z0-9.-]{0,9}\b", re.I),
+    re.compile(
+        r"\b(?:i\s+)?recommend(?:ation|ed|s|ing)?(?:\s+that\s+you)?\s+"
+        r"(?:to\s+)?(?:buy|buying|sell|selling|hold|holding)\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(?:increase|reduce|decrease|raise|lower)\s+(?:your\s+)?exposure\s+to\s+"
+        r"[A-Z][A-Z0-9.-]{0,9}\b",
+        re.I,
+    ),
 )
 _CERTAINTY_PATTERNS = (
     re.compile(r"\bguarantee(?:d|s)?\b", re.I),
@@ -236,7 +245,32 @@ def _is_positive_number(value: Any) -> bool:
 
 
 def _contains_direct_recommendation(commentary: str) -> bool:
-    return any(pattern.search(commentary) for pattern in _RECOMMENDATION_PATTERNS)
+    for pattern in _RECOMMENDATION_PATTERNS:
+        for match in pattern.finditer(commentary):
+            sentence_start = max(
+                commentary.rfind(".", 0, match.start()),
+                commentary.rfind("!", 0, match.start()),
+                commentary.rfind("?", 0, match.start()),
+                commentary.rfind("\n", 0, match.start()),
+            )
+            sentence_prefix = commentary[sentence_start + 1 : match.start()].lower()
+            if any(
+                negation in sentence_prefix
+                for negation in (
+                    "not ",
+                    "does not ",
+                    "do not ",
+                    "is not ",
+                    "isn't ",
+                    "no recommendation ",
+                    "without ",
+                )
+            ):
+                continue
+
+            return True
+
+    return False
 
 
 def _commentary_metric_consistency_errors(

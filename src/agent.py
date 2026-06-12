@@ -160,7 +160,8 @@ def _generate_risk_commentary(
                     "targets, or recommendations. Include downside risk, VaR, Expected Shortfall, "
                     "maximum drawdown, the largest single-name or single-ETF weight, factor/sector-style "
                     "concentration inferred from ticker composition, assumptions and limitations, and "
-                    "a disclaimer that this is not investment advice. If supplied composition notes "
+                    "the exact disclaimer: 'This commentary is for analytical demonstration only and "
+                    "does not constitute investment advice.' If supplied composition notes "
                     "mention overlapping growth, technology, AI, semiconductor, broad equity, or "
                     "long-duration bond exposure, discuss those notes explicitly. State that inferred "
                     "factor/sector exposure is based on ticker composition and is not calculated from "
@@ -245,7 +246,8 @@ def regenerate_risk_commentary_with_validation_errors(
                     "validation error and warning. Use only the supplied calculated facts and "
                     "retrieved methodology notes. Do not invent metrics or citations, make "
                     "investment recommendations, or claim guaranteed outcomes. Preserve clear "
-                    "assumptions, limitations, and the not-investment-advice disclaimer."
+                    "assumptions and limitations. End with the exact disclaimer: 'This commentary is "
+                    "for analytical demonstration only and does not constitute investment advice.'"
                 ),
             },
             {
@@ -393,6 +395,7 @@ def _build_fallback_commentary(risk_report: dict, methodology_docs: list[dict]) 
         f"{metrics['max_drawdown']:.2%}. The largest single position is "
         f"{tickers[largest_index]} at {weights[largest_index]:.2%}. Assumptions and "
         "limitations: this fallback commentary is based only on calculated metrics, "
-        "historical data, and local methodology retrieval; it is not investment advice."
+        "historical data, and local methodology retrieval. This commentary is for "
+        "analytical demonstration only and does not constitute investment advice."
         f"{references}"
     )

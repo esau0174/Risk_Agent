@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from src.report_validator import validate_generated_report
 
 
@@ -100,6 +102,55 @@ def test_direct_buy_sell_hold_recommendation_fails():
     commentary = (
         "You should buy SPY. Assumptions and limitations: historical data only. "
         "Methodology reference: Historical VaR."
+    )
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        commentary,
+    )
+
+    assert result.passed is False
+    assert any("buy, sell, or hold" in error for error in result.errors)
+
+
+@pytest.mark.parametrize(
+    "disclaimer",
+    [
+        "This commentary does not constitute investment advice.",
+        "This is not investment advice.",
+        "This is not a recommendation to buy, sell, or hold any security.",
+    ],
+)
+def test_negated_recommendation_disclaimers_are_allowed(disclaimer):
+    commentary = f"Assumptions and limitations: historical data only. {disclaimer}"
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        commentary,
+    )
+
+    assert result.passed is True
+
+
+@pytest.mark.parametrize(
+    "recommendation",
+    [
+        "Buy SPY.",
+        "Sell NVDA.",
+        "Hold QQQ.",
+        "I recommend buying SPY.",
+        "Increase exposure to NVDA.",
+        "Reduce exposure to QQQ.",
+    ],
+)
+def test_actionable_trade_recommendations_are_forbidden(recommendation):
+    commentary = (
+        f"{recommendation} Assumptions and limitations: historical data only. "
+        "This commentary does not constitute investment advice."
     )
 
     result = validate_generated_report(

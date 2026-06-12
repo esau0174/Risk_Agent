@@ -88,7 +88,7 @@ def test_run_risk_workflow_without_llm_returns_completed_result():
     }
     assert result.risk_report["risk_metrics"]["historical_var"] == 0.02
     assert result.methodology_notes
-    assert "not investment advice" in result.llm_commentary
+    assert "does not constitute investment advice" in result.llm_commentary
     assert result.validation_result.passed is True
     assert any(step.name == "validate_report" for step in result.plan.steps)
     assert [entry.tool_name for entry in result.execution_trace] == [

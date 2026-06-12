@@ -42,6 +42,14 @@ def main() -> None:
             f"{step.status} - {step.output_summary}"
         )
     print()
+    print("Execution Trace")
+    for entry in result.execution_trace:
+        print(f"- Step {entry.step_number}: {entry.tool_name} [{entry.status}]")
+        print(f"  Input: {entry.input_summary}")
+        print(f"  Output: {entry.output_summary}")
+        if entry.error:
+            print(f"  Error: {entry.error}")
+    print()
     print("Parsed portfolio:")
     print(f"Tickers: {result.parsed_portfolio['tickers']}")
     print(f"Weights: {result.parsed_portfolio['weights']}")
