@@ -19,7 +19,7 @@ def test_expected_tools_are_registered():
     assert [tool.name for tool in tools] == EXPECTED_TOOL_NAMES
     assert all(tool.description for tool in tools)
     assert all(tool.callable_name for tool in tools)
-    assert all(callable(tool.callable) for tool in tools)
+    assert all(callable(tool.handler) for tool in tools)
 
 
 def test_get_tool_returns_parse_portfolio_tool():
@@ -27,7 +27,7 @@ def test_get_tool_returns_parse_portfolio_tool():
 
     assert tool.name == "parse_portfolio"
     assert tool.callable_name == "src.portfolio_parser.parse_portfolio_text"
-    assert callable(tool.callable)
+    assert callable(tool.handler)
     assert "tickers and weights" in tool.description
 
 

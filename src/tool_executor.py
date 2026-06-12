@@ -38,7 +38,7 @@ class ToolExecutor:
 
         metadata = {"callable_name": tool.callable_name}
         try:
-            output = tool.callable(*args, **kwargs)
+            output = tool.handler(*args, **kwargs)
         except Exception as exc:
             return ToolResult(
                 tool_name=tool_name,

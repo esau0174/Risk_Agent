@@ -21,7 +21,7 @@ The project is designed to demonstrate practical financial risk analytics, clean
 
 ## Current Status
 
-The project currently includes the Python risk analytics backend, rule-based portfolio parsing, explicit agentic workflow orchestration, a minimal OpenAI-powered commentary agent, simple local RAG over methodology notes, and a Streamlit UI. Vector search and formal tool-calling workflows are planned future improvements.
+The project currently includes the Python risk analytics backend, rule-based portfolio parsing, explicit agentic workflow orchestration, a lightweight ToolExecutor layer, a minimal OpenAI-powered commentary agent, simple local RAG over methodology notes, and a Streamlit UI. Vector search and formal tool-calling workflows are planned future improvements.
 
 ## Architecture
 
@@ -52,7 +52,7 @@ The workflow layer records each step, status, and output summary, making the age
 
 ### Tool Registry
 
-The workflow exposes deterministic risk analytics capabilities as registered tools. The current registry includes portfolio parsing, input validation, risk metric calculation, methodology retrieval, commentary generation, and report validation. This keeps tool availability explicit, documented, and inspectable without changing the underlying risk calculation logic.
+The workflow exposes deterministic risk analytics capabilities as registered tools. The current registry includes portfolio parsing, input validation, risk metric calculation, methodology retrieval, commentary generation, and report validation. A lightweight ToolExecutor resolves each registered handler by name and returns a structured execution result, keeping tool availability and invocation explicit without changing the underlying risk calculation logic.
 
 ### Report Validation Gate
 

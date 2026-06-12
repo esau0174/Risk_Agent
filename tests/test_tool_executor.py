@@ -7,7 +7,7 @@ def test_successful_tool_execution_returns_output_and_metadata():
         name="add",
         description="Add two numbers.",
         callable_name="tests.add",
-        callable=lambda left, right: left + right,
+        handler=lambda left, right: left + right,
     )
     executor = ToolExecutor([tool])
 
@@ -37,7 +37,7 @@ def test_tool_execution_failure_returns_error_details():
         name="failing_tool",
         description="Always fails.",
         callable_name="tests.failing_tool",
-        callable=failing_tool,
+        handler=failing_tool,
     )
     executor = ToolExecutor([tool])
 

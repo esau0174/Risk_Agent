@@ -62,7 +62,7 @@ def test_run_risk_workflow_without_llm_returns_completed_result():
         }
 
     tools = [
-        replace(tool, callable=fake_generate_portfolio_risk_report)
+        replace(tool, handler=fake_generate_portfolio_risk_report)
         if tool.name == "calculate_risk_metrics"
         else tool
         for tool in list_registered_tools()
