@@ -142,6 +142,67 @@ def test_failed_tool_execution_is_recorded_before_workflow_raises():
     assert trace[0].error == "ValueError: unable to parse portfolio"
 
 
+def test_run_risk_workflow_uses_portfolio_file_and_skips_parser(tmp_path):
+    portfolio_path = tmp_path / "portfolio.csv"
+    portfolio_path.write_text("ticker,weight\nSPY,60%\nQQQ,40%\n", encoding="utf-8")
+
+    def parser_must_not_run(query):
+        raise AssertionError("parse_portfolio should be skipped for file input")
+
+    replacements = {
+        "parse_portfolio": parser_must_not_run,
+        "calculate_risk_metrics": _fake_generate_portfolio_risk_report,
+    }
+    tools = [
+        replace(tool, handler=replacements[tool.name])
+        if tool.name in replacements
+        else tool
+        for tool in list_registered_tools()
+    ]
+
+    result = run_risk_workflow(
+        "Analyze the uploaded portfolio for downside risk.",
+        use_llm=False,
+        tool_executor=ToolExecutor(tools),
+        portfolio_file=str(portfolio_path),
+    )
+
+    assert [step.name for step in result.plan.steps] == [
+        "load_portfolio_file",
+        "validate_portfolio",
+        "calculate_risk_metrics",
+        "retrieve_methodology",
+        "generate_commentary",
+        "validate_report",
+    ]
+    assert result.execution_trace[0].tool_name == "load_portfolio_file"
+    assert not any(
+        entry.tool_name == "parse_portfolio" for entry in result.execution_trace
+    )
+    assert result.parsed_portfolio == {
+        "tickers": ["SPY", "QQQ"],
+        "weights": [0.6, 0.4],
+    }
+
+
+def test_natural_language_workflow_still_uses_parser():
+    tools = [
+        replace(tool, handler=_fake_generate_portfolio_risk_report)
+        if tool.name == "calculate_risk_metrics"
+        else tool
+        for tool in list_registered_tools()
+    ]
+
+    result = run_risk_workflow(
+        "40% SPY, 60% QQQ",
+        use_llm=False,
+        tool_executor=ToolExecutor(tools),
+    )
+
+    assert result.plan.steps[0].name == "parse_portfolio"
+    assert result.execution_trace[0].tool_name == "parse_portfolio"
+
+
 def test_validation_failure_regenerates_commentary_once_and_revalidates():
     validation_results = iter(
         [

@@ -9,6 +9,7 @@ from src.agent import (
     regenerate_risk_commentary_with_validation_errors,
 )
 from src.portfolio import validate_weights
+from src.portfolio_loader import load_portfolio_file
 from src.portfolio_parser import parse_portfolio_text
 from src.rag import retrieve_relevant_methodology
 from src.report_validator import validate_generated_report
@@ -29,6 +30,12 @@ _REGISTERED_TOOLS: tuple[RiskTool, ...] = (
         description="Extract tickers and weights from a natural-language portfolio query.",
         callable_name="src.portfolio_parser.parse_portfolio_text",
         handler=parse_portfolio_text,
+    ),
+    RiskTool(
+        name="load_portfolio_file",
+        description="Load and validate portfolio holdings from CSV, XLSX, or JSON.",
+        callable_name="src.portfolio_loader.load_portfolio_file",
+        handler=load_portfolio_file,
     ),
     RiskTool(
         name="validate_portfolio",

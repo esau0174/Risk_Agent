@@ -146,29 +146,52 @@ def run_risk_workflow(
     query: str,
     use_llm: bool = True,
     tool_executor: ToolExecutor | None = None,
+    portfolio_file: str | None = None,
 ) -> WorkflowResult:
     """Run the deterministic multi-step risk workflow."""
-    plan = build_risk_workflow_plan(query)
+    plan = (
+        _build_file_portfolio_workflow_plan()
+        if portfolio_file is not None
+        else build_risk_workflow_plan(query)
+    )
     warnings: list[str] = []
     execution_trace: list[ExecutionTraceEntry] = []
     executor = tool_executor or ToolExecutor()
 
-    parsed_portfolio = _execute_traced(
-        executor,
-        execution_trace,
-        "parse_portfolio",
-        "Natural-language portfolio query.",
-        lambda output: f"Parsed {len(output['tickers'])} tickers.",
-        query,
-    )
-    _complete_step(
-        plan,
-        "parse_portfolio",
-        (
-            f"Parsed tickers {parsed_portfolio['tickers']} with weights "
-            f"{parsed_portfolio['weights']}."
-        ),
-    )
+    if portfolio_file is not None:
+        parsed_portfolio = _execute_traced(
+            executor,
+            execution_trace,
+            "load_portfolio_file",
+            f"Structured portfolio file: {portfolio_file}.",
+            lambda output: f"Loaded {len(output['tickers'])} tickers from file.",
+            portfolio_file,
+        )
+        _complete_step(
+            plan,
+            "load_portfolio_file",
+            (
+                f"Loaded tickers {parsed_portfolio['tickers']} with weights "
+                f"{parsed_portfolio['weights']}."
+            ),
+        )
+    else:
+        parsed_portfolio = _execute_traced(
+            executor,
+            execution_trace,
+            "parse_portfolio",
+            "Natural-language portfolio query.",
+            lambda output: f"Parsed {len(output['tickers'])} tickers.",
+            query,
+        )
+        _complete_step(
+            plan,
+            "parse_portfolio",
+            (
+                f"Parsed tickers {parsed_portfolio['tickers']} with weights "
+                f"{parsed_portfolio['weights']}."
+            ),
+        )
 
     tickers = parsed_portfolio["tickers"]
     validated_weights = _execute_traced(
@@ -349,6 +372,20 @@ def _registered_step(tool_name: str) -> WorkflowStep:
         description=tool.description,
         status="pending",
         tool_name=tool.name,
+    )
+
+
+def _build_file_portfolio_workflow_plan() -> WorkflowPlan:
+    return WorkflowPlan(
+        objective="Analyze risk for a structured portfolio file using a natural-language instruction.",
+        steps=[
+            _registered_step("load_portfolio_file"),
+            _registered_step("validate_portfolio"),
+            _registered_step("calculate_risk_metrics"),
+            _registered_step("retrieve_methodology"),
+            _registered_step("generate_commentary"),
+            _registered_step("validate_report"),
+        ],
     )
 
 

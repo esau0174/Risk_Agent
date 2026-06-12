@@ -8,3 +8,4 @@ plotly
 streamlit
 python-dotenv
 openai
+openpyxl

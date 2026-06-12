@@ -20,12 +20,14 @@ def main() -> None:
         print("OPENAI_API_KEY is not set. Skipping LLM agent demo.")
         return
 
-    query = (
-        "Analyze a portfolio with 40% SPY, 30% QQQ, 20% NVDA, and 10% TLT. "
-        "Focus on downside risk and concentration risk."
-    )
+    query = "Analyze the uploaded portfolio for downside risk and concentration risk."
+    portfolio_file = "examples/sample_portfolio.csv"
 
-    result = run_risk_workflow(query, use_llm=True)
+    result = run_risk_workflow(
+        query,
+        use_llm=True,
+        portfolio_file=portfolio_file,
+    )
 
     print("FinRisk Agent - Agentic Risk Workflow Demo")
     print("==========================================")

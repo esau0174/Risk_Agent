@@ -5,6 +5,7 @@ from src.tool_registry import get_tool, list_registered_tools
 
 EXPECTED_TOOL_NAMES = [
     "parse_portfolio",
+    "load_portfolio_file",
     "validate_portfolio",
     "calculate_risk_metrics",
     "retrieve_methodology",
