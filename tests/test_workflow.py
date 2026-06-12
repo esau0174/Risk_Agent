@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import pytest
+
 from src.tool_executor import ToolExecutor
 from src.tool_registry import list_registered_tools
 from src.workflow import WorkflowResult, build_risk_workflow_plan, run_risk_workflow
@@ -103,3 +105,32 @@ def test_run_risk_workflow_without_llm_returns_completed_result():
     assert result.warnings == [
         "LLM commentary disabled; returned deterministic fallback commentary."
     ]
+
+
+def test_failed_tool_execution_is_recorded_before_workflow_raises():
+    def failing_parser(query):
+        raise ValueError("unable to parse portfolio")
+
+    tools = [
+        replace(tool, handler=failing_parser)
+        if tool.name == "parse_portfolio"
+        else tool
+        for tool in list_registered_tools()
+    ]
+    executor = ToolExecutor(tools)
+
+    with pytest.raises(RuntimeError, match="parse_portfolio") as exc_info:
+        run_risk_workflow(
+            "invalid portfolio query",
+            use_llm=False,
+            tool_executor=executor,
+        )
+
+    trace = exc_info.value.execution_trace
+    assert len(trace) == 1
+    assert trace[0].step_number == 1
+    assert trace[0].tool_name == "parse_portfolio"
+    assert trace[0].status == "failed"
+    assert trace[0].input_summary == "Natural-language portfolio query."
+    assert trace[0].output_summary == "Tool execution produced no output."
+    assert trace[0].error == "ValueError: unable to parse portfolio"

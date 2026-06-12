@@ -10,7 +10,7 @@ from src.agent import (
 )
 from src.rag import load_methodology_docs
 from src.report_validator import ValidationResult
-from src.tool_executor import ToolExecutor, ToolResult
+from src.tool_executor import ToolExecutor
 from src.tool_registry import get_tool
 
 
@@ -116,9 +116,7 @@ def run_risk_workflow(
         execution_trace,
         "parse_portfolio",
         "Natural-language portfolio query.",
-        lambda output: (
-            f"Parsed {len(output['tickers'])} holdings: {output['tickers']}."
-        ),
+        lambda output: f"Parsed {len(output['tickers'])} tickers.",
         query,
     )
     _complete_step(
@@ -136,9 +134,7 @@ def run_risk_workflow(
         execution_trace,
         "validate_portfolio",
         f"{len(tickers)} tickers and portfolio weights.",
-        lambda output: (
-            f"Validated {len(output)} weights with total {output.sum():.6f}."
-        ),
+        lambda output: f"Portfolio validation passed for {len(output)} weights.",
         tickers,
         parsed_portfolio["weights"],
     )
@@ -179,9 +175,7 @@ def run_risk_workflow(
         execution_trace,
         "retrieve_methodology",
         f"Methodology query across {len(docs)} local documents.",
-        lambda output: (
-            f"Retrieved {len(output)} notes: {[doc['title'] for doc in output]}."
-        ),
+        lambda output: f"Retrieved {len(output)} methodology notes.",
         methodology_query,
         docs,
         top_k=4,
@@ -266,13 +260,6 @@ def _complete_step(plan: WorkflowPlan, step_name: str, output_summary: str) -> N
     raise ValueError(f"Workflow step not found: {step_name}")
 
 
-def _require_tool_output(result: ToolResult):
-    if result.status != "success":
-        raise RuntimeError(f"Tool '{result.tool_name}' failed: {result.error}")
-
-    return result.output
-
-
 def _execute_traced(
     executor: ToolExecutor,
     execution_trace: list[ExecutionTraceEntry],
@@ -298,4 +285,9 @@ def _execute_traced(
             error=result.error,
         )
     )
-    return _require_tool_output(result)
+    if result.status != "success":
+        error = RuntimeError(f"Tool '{result.tool_name}' failed: {result.error}")
+        error.execution_trace = list(execution_trace)
+        raise error
+
+    return result.output
