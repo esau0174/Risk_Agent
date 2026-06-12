@@ -171,6 +171,7 @@ def run_risk_workflow(
         f"Calculated risk metrics: {metric_names}.",
     )
 
+    # TODO: Consider moving methodology loading behind a registered tool or provider.
     docs = load_methodology_docs()
     methodology_query = _build_methodology_query(query, risk_report)
     methodology_notes = _execute_traced(
