@@ -250,3 +250,25 @@ def test_metric_percentage_within_tolerance_passes():
     )
 
     assert result.passed is True
+
+
+def test_var_and_expected_shortfall_in_separate_sentences_do_not_cross_match():
+    report = _valid_risk_report()
+    report["risk_metrics"]["historical_var"] = 0.0232
+    report["risk_metrics"]["expected_shortfall"] = 0.0347
+    commentary = (
+        "Historical VaR, calculated for a 95% confidence level, indicates a potential "
+        "loss threshold of approximately 2.32%. "
+        "Expected Shortfall, conditional on exceeding the VaR threshold, is "
+        "approximately 3.47%. Assumptions and limitations: historical data only; "
+        "not investment advice."
+    )
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        report,
+        _valid_methodology_notes(),
+        commentary,
+    )
+
+    assert result.passed is True
