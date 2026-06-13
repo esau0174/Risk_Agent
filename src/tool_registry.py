@@ -13,6 +13,7 @@ from src.portfolio_loader import load_portfolio_file
 from src.portfolio_parser import parse_portfolio_text
 from src.rag import retrieve_relevant_methodology
 from src.report_validator import validate_generated_report
+from src.risk_config import load_risk_config
 from src.risk_report import generate_portfolio_risk_report
 
 
@@ -42,6 +43,12 @@ _REGISTERED_TOOLS: tuple[RiskTool, ...] = (
         description="Validate ticker and weight consistency before risk calculations.",
         callable_name="src.portfolio.validate_weights",
         handler=validate_weights,
+    ),
+    RiskTool(
+        name="load_risk_config",
+        description="Load and validate risk calculation and reporting configuration.",
+        callable_name="src.risk_config.load_risk_config",
+        handler=load_risk_config,
     ),
     RiskTool(
         name="calculate_risk_metrics",

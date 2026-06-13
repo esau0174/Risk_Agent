@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 
 import pytest
@@ -16,6 +17,7 @@ def _fake_generate_portfolio_risk_report(
     start_date,
     end_date=None,
     confidence_level=0.95,
+    risk_config=None,
 ):
     return {
         "metadata": {
@@ -48,6 +50,7 @@ def test_build_risk_workflow_plan_returns_expected_steps():
     assert [step.name for step in plan.steps] == [
         "parse_portfolio",
         "validate_portfolio",
+        "load_risk_config",
         "calculate_risk_metrics",
         "retrieve_methodology",
         "generate_commentary",
@@ -56,6 +59,7 @@ def test_build_risk_workflow_plan_returns_expected_steps():
     assert [step.tool_name for step in plan.steps] == [
         "parse_portfolio",
         "validate_portfolio",
+        "load_risk_config",
         "calculate_risk_metrics",
         "retrieve_methodology",
         "generate_commentary",
@@ -94,12 +98,13 @@ def test_run_risk_workflow_without_llm_returns_completed_result():
     assert [entry.tool_name for entry in result.execution_trace] == [
         "parse_portfolio",
         "validate_portfolio",
+        "load_risk_config",
         "calculate_risk_metrics",
         "retrieve_methodology",
         "generate_commentary",
         "validate_report",
     ]
-    assert [entry.step_number for entry in result.execution_trace] == [1, 2, 3, 4, 5, 6]
+    assert [entry.step_number for entry in result.execution_trace] == [1, 2, 3, 4, 5, 6, 7]
     assert all(entry.status == "success" for entry in result.execution_trace)
     assert all(entry.input_summary for entry in result.execution_trace)
     assert all(entry.output_summary for entry in result.execution_trace)
@@ -170,6 +175,7 @@ def test_run_risk_workflow_uses_portfolio_file_and_skips_parser(tmp_path):
     assert [step.name for step in result.plan.steps] == [
         "load_portfolio_file",
         "validate_portfolio",
+        "load_risk_config",
         "calculate_risk_metrics",
         "retrieve_methodology",
         "generate_commentary",
@@ -201,6 +207,57 @@ def test_natural_language_workflow_still_uses_parser():
 
     assert result.plan.steps[0].name == "parse_portfolio"
     assert result.execution_trace[0].tool_name == "parse_portfolio"
+
+
+def test_run_risk_workflow_loads_config_file_through_executor(tmp_path):
+    config_path = tmp_path / "risk_config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "market_data": {
+                    "start_date": "2024-01-01",
+                    "end_date": "2024-06-30",
+                },
+                "returns": {
+                    "frequency": "daily",
+                    "annualization_factor": 250,
+                },
+                "var": {
+                    "confidence_level": 0.99,
+                    "method": "historical",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    captured = {}
+
+    def capture_configured_report(*args, **kwargs):
+        captured["start_date"] = kwargs["start_date"]
+        captured["risk_config"] = kwargs["risk_config"]
+        return _fake_generate_portfolio_risk_report(*args, **kwargs)
+
+    tools = [
+        replace(tool, handler=capture_configured_report)
+        if tool.name == "calculate_risk_metrics"
+        else tool
+        for tool in list_registered_tools()
+    ]
+
+    result = run_risk_workflow(
+        "40% SPY, 60% QQQ",
+        use_llm=False,
+        tool_executor=ToolExecutor(tools),
+        config_file=str(config_path),
+    )
+
+    assert "load_risk_config" in [
+        entry.tool_name for entry in result.execution_trace
+    ]
+    assert captured["start_date"] == "2024-01-01"
+    assert captured["risk_config"].market_data.end_date == "2024-06-30"
+    assert captured["risk_config"].returns.annualization_factor == 250
+    assert captured["risk_config"].var.confidence_level == 0.99
 
 
 def test_validation_failure_regenerates_commentary_once_and_revalidates():
@@ -251,6 +308,7 @@ def test_validation_failure_regenerates_commentary_once_and_revalidates():
     assert [entry.tool_name for entry in result.execution_trace] == [
         "parse_portfolio",
         "validate_portfolio",
+        "load_risk_config",
         "calculate_risk_metrics",
         "retrieve_methodology",
         "generate_commentary",

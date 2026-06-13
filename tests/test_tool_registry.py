@@ -7,6 +7,7 @@ EXPECTED_TOOL_NAMES = [
     "parse_portfolio",
     "load_portfolio_file",
     "validate_portfolio",
+    "load_risk_config",
     "calculate_risk_metrics",
     "retrieve_methodology",
     "generate_commentary",

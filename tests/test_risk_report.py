@@ -6,6 +6,13 @@ import pandas as pd
 import pytest
 
 from src import risk_report
+from src.risk_config import (
+    MarketDataConfig,
+    ReturnsConfig,
+    RiskConfig,
+    RiskMetricsConfig,
+    VarConfig,
+)
 
 
 def test_generate_portfolio_risk_report_uses_synthetic_price_data(monkeypatch):
@@ -73,3 +80,42 @@ def test_generate_portfolio_risk_report_does_not_call_yfinance_directly(monkeypa
 
     assert called is True
     assert report["number_of_observations"] == 1
+
+
+def test_generate_portfolio_risk_report_uses_risk_config(monkeypatch):
+    prices = pd.DataFrame(
+        {"SPY": [100.0, 102.0, 101.0], "QQQ": [100.0, 101.0, 103.0]}
+    )
+
+    def fake_download_price_data(tickers, start_date, end_date=None):
+        assert start_date == "2024-01-01"
+        assert end_date == "2024-12-31"
+        return prices
+
+    monkeypatch.setattr(risk_report, "download_price_data", fake_download_price_data)
+    config = RiskConfig(
+        market_data=MarketDataConfig("2024-01-01", "2024-12-31"),
+        returns=ReturnsConfig("daily", 250),
+        var=VarConfig(0.99, "historical"),
+        risk_metrics=RiskMetricsConfig(
+            ("annualized_volatility", "historical_var")
+        ),
+    )
+
+    report = risk_report.generate_portfolio_risk_report(
+        ["SPY", "QQQ"],
+        [0.5, 0.5],
+        "ignored-by-config",
+        risk_config=config,
+    )
+
+    assert set(report["risk_metrics"]) == {
+        "annualized_volatility",
+        "historical_var",
+    }
+    assert report["metadata"]["confidence_level"] == 0.99
+    assert report["metadata"]["annualization_factor"] == 250
+    assert report["metadata"]["enabled_risk_metrics"] == [
+        "annualized_volatility",
+        "historical_var",
+    ]

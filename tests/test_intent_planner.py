@@ -27,6 +27,7 @@ def test_portfolio_risk_plan_matches_existing_full_workflow():
     assert [step.name for step in plan.steps] == [
         "parse_portfolio",
         "validate_portfolio",
+        "load_risk_config",
         "calculate_risk_metrics",
         "retrieve_methodology",
         "generate_commentary",

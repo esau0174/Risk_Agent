@@ -5,10 +5,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from src.agent import (
-    DEFAULT_START_DATE,
-    _build_methodology_query,
-)
+from src.agent import _build_methodology_query
 from src.rag import load_methodology_docs
 from src.report_validator import ValidationResult
 from src.tool_executor import ToolExecutor
@@ -104,6 +101,7 @@ def build_workflow_plan_for_intent(intent: Intent) -> WorkflowPlan:
             steps=[
                 _registered_step("parse_portfolio"),
                 _registered_step("validate_portfolio"),
+                _registered_step("load_risk_config"),
                 _registered_step("calculate_risk_metrics"),
                 _registered_step("retrieve_methodology"),
                 _registered_step("generate_commentary"),
@@ -147,6 +145,7 @@ def run_risk_workflow(
     use_llm: bool = True,
     tool_executor: ToolExecutor | None = None,
     portfolio_file: str | None = None,
+    config_file: str | None = None,
 ) -> WorkflowResult:
     """Run the deterministic multi-step risk workflow."""
     plan = (
@@ -211,19 +210,45 @@ def run_risk_workflow(
         f"Validated {len(tickers)} holdings; weights sum to 1.0.",
     )
 
+    risk_config = _execute_traced(
+        executor,
+        execution_trace,
+        "load_risk_config",
+        (
+            f"Risk configuration file: {config_file}."
+            if config_file is not None
+            else "Default risk configuration."
+        ),
+        lambda output: (
+            f"Loaded {output.var.method} VaR configuration at "
+            f"{output.var.confidence_level:.0%} confidence."
+        ),
+        config_file,
+    )
+    _complete_step(
+        plan,
+        "load_risk_config",
+        (
+            f"Loaded {risk_config.returns.frequency} return assumptions with "
+            f"annualization factor {risk_config.returns.annualization_factor}."
+        ),
+    )
+
     risk_report = _execute_traced(
         executor,
         execution_trace,
         "calculate_risk_metrics",
         (
-            f"Portfolio with {len(tickers)} holdings from {DEFAULT_START_DATE}."
+            f"Portfolio with {len(tickers)} holdings from "
+            f"{risk_config.market_data.start_date}."
         ),
         lambda output: (
             "Calculated metrics: " + ", ".join(output["risk_metrics"].keys()) + "."
         ),
         tickers,
         weights,
-        start_date=DEFAULT_START_DATE,
+        start_date=risk_config.market_data.start_date,
+        risk_config=risk_config,
     )
     metric_names = ", ".join(risk_report["risk_metrics"].keys())
     _complete_step(
@@ -381,6 +406,7 @@ def _build_file_portfolio_workflow_plan() -> WorkflowPlan:
         steps=[
             _registered_step("load_portfolio_file"),
             _registered_step("validate_portfolio"),
+            _registered_step("load_risk_config"),
             _registered_step("calculate_risk_metrics"),
             _registered_step("retrieve_methodology"),
             _registered_step("generate_commentary"),
