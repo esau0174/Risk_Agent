@@ -78,134 +78,203 @@ def validate_generated_report(
     checks: list[ValidationCheck] = []
     errors: list[str] = []
     warnings: list[str] = []
+    commentary_text = commentary or ""
 
-    if pfe_result is None:
-        _run_check(
-            checks,
-            errors,
-            "portfolio_weights_sum_to_one",
-            _weights_sum_to_one(parsed_portfolio),
-            "Portfolio weights sum to 1 within tolerance.",
-            "Portfolio weights must sum to 1 within tolerance.",
-        )
+    _validate_market_metric_consistency(
+        checks,
+        errors,
+        parsed_portfolio,
+        risk_report,
+        commentary_text,
+        percentage_tolerance,
+        enabled=pfe_result is None,
+    )
+    _validate_pfe_result_consistency(checks, errors, commentary_text, pfe_result)
+    _validate_stress_result_consistency(
+        checks,
+        errors,
+        warnings,
+        commentary_text,
+        stress_results,
+        percentage_tolerance,
+    )
+    _validate_commentary_guardrails(checks, errors, warnings, commentary_text)
+    _validate_methodology_grounding(
+        checks,
+        errors,
+        commentary_text,
+        methodology_notes,
+    )
+
+    return ValidationResult(
+        passed=not errors,
+        checks=checks,
+        errors=errors,
+        warnings=warnings,
+    )
+
+
+def _validate_market_metric_consistency(
+    checks: list[ValidationCheck],
+    errors: list[str],
+    parsed_portfolio,
+    risk_report,
+    commentary: str,
+    percentage_tolerance: float,
+    enabled: bool,
+) -> None:
+    if not enabled:
+        return
+
+    _run_check(
+        checks,
+        errors,
+        "portfolio_weights_sum_to_one",
+        _weights_sum_to_one(parsed_portfolio),
+        "Portfolio weights sum to 1 within tolerance.",
+        "Portfolio weights must sum to 1 within tolerance.",
+    )
 
     risk_metrics = _get(risk_report, "risk_metrics", {}) if risk_report else {}
     historical_var = _get(risk_metrics, "historical_var")
     expected_shortfall = _get(risk_metrics, "expected_shortfall")
     max_drawdown = _get(risk_metrics, "max_drawdown")
+    _run_check(
+        checks,
+        errors,
+        "historical_var_positive_loss",
+        _is_positive_number(historical_var),
+        "Historical VaR is a positive loss magnitude.",
+        "Historical VaR must be a positive loss magnitude.",
+    )
+    _run_check(
+        checks,
+        errors,
+        "expected_shortfall_positive_loss",
+        _is_positive_number(expected_shortfall),
+        "Expected Shortfall is a positive loss magnitude.",
+        "Expected Shortfall must be a positive loss magnitude.",
+    )
+    _run_check(
+        checks,
+        errors,
+        "expected_shortfall_at_least_var",
+        (
+            _is_number(expected_shortfall)
+            and _is_number(historical_var)
+            and expected_shortfall >= historical_var
+        ),
+        "Expected Shortfall is greater than or equal to historical VaR.",
+        "Expected Shortfall must be greater than or equal to historical VaR.",
+    )
+    _run_check(
+        checks,
+        errors,
+        "max_drawdown_positive_loss",
+        _is_positive_number(max_drawdown),
+        "Maximum drawdown is a positive loss magnitude.",
+        "Maximum drawdown must be a positive loss magnitude.",
+    )
 
-    if pfe_result is None:
-        _run_check(
-            checks,
-            errors,
-            "historical_var_positive_loss",
-            _is_positive_number(historical_var),
-            "Historical VaR is a positive loss magnitude.",
-            "Historical VaR must be a positive loss magnitude.",
-        )
-        _run_check(
-            checks,
-            errors,
-            "expected_shortfall_positive_loss",
-            _is_positive_number(expected_shortfall),
-            "Expected Shortfall is a positive loss magnitude.",
-            "Expected Shortfall must be a positive loss magnitude.",
-        )
-        _run_check(
-            checks,
-            errors,
-            "expected_shortfall_at_least_var",
-            (
-                _is_number(expected_shortfall)
-                and _is_number(historical_var)
-                and expected_shortfall >= historical_var
+    if risk_report is None:
+        return
+    consistency_errors = _commentary_metric_consistency_errors(
+        commentary,
+        risk_metrics,
+        percentage_tolerance,
+    )
+    checks.append(
+        ValidationCheck(
+            name="commentary_metric_consistency",
+            passed=not consistency_errors,
+            message=(
+                "Commentary percentage figures are consistent with calculated risk metrics."
+                if not consistency_errors
+                else "Commentary contains percentage figures inconsistent with calculated risk metrics."
             ),
-            "Expected Shortfall is greater than or equal to historical VaR.",
-            "Expected Shortfall must be greater than or equal to historical VaR.",
         )
-        _run_check(
-            checks,
-            errors,
-            "max_drawdown_positive_loss",
-            _is_positive_number(max_drawdown),
-            "Maximum drawdown is a positive loss magnitude.",
-            "Maximum drawdown must be a positive loss magnitude.",
-        )
+    )
+    errors.extend(consistency_errors)
 
-    commentary_text = commentary or ""
-    if risk_report is not None:
-        consistency_errors = _commentary_metric_consistency_errors(
-            commentary_text,
-            risk_metrics,
-            percentage_tolerance,
-        )
-        checks.append(
-            ValidationCheck(
-                name="commentary_metric_consistency",
-                passed=not consistency_errors,
-                message=(
-                    "Commentary percentage figures are consistent with calculated risk metrics."
-                    if not consistency_errors
-                    else "Commentary contains percentage figures inconsistent with calculated risk metrics."
-                ),
-            )
-        )
-        errors.extend(consistency_errors)
 
-    if pfe_result is not None:
-        pfe_errors = _pfe_result_consistency_errors(
-            commentary_text,
-            pfe_result,
-            value_tolerance=0.10,
-            time_tolerance=0.01,
+def _validate_pfe_result_consistency(
+    checks: list[ValidationCheck],
+    errors: list[str],
+    commentary: str,
+    pfe_result,
+) -> None:
+    if pfe_result is None:
+        return
+    pfe_errors = _pfe_result_consistency_errors(
+        commentary,
+        pfe_result,
+        value_tolerance=0.10,
+        time_tolerance=0.01,
+    )
+    checks.append(
+        ValidationCheck(
+            name="pfe_result_consistency",
+            passed=not pfe_errors,
+            message=(
+                "Commentary PFE figures are consistent with calculated exposure metrics."
+                if not pfe_errors
+                else "Commentary contains figures inconsistent with calculated PFE metrics."
+            ),
         )
-        checks.append(
-            ValidationCheck(
-                name="pfe_result_consistency",
-                passed=not pfe_errors,
-                message=(
-                    "Commentary PFE figures are consistent with calculated exposure metrics."
-                    if not pfe_errors
-                    else "Commentary contains figures inconsistent with calculated PFE metrics."
-                ),
-            )
-        )
-        errors.extend(pfe_errors)
+    )
+    errors.extend(pfe_errors)
 
-    if stress_results:
-        stress_errors, stress_warning = _stress_result_consistency_findings(
-            commentary_text,
-            stress_results,
-            percentage_tolerance,
-            value_tolerance=0.10,
-        )
-        stress_check_passed = not stress_errors and stress_warning is None
-        checks.append(
-            ValidationCheck(
-                name="stress_result_consistency",
-                passed=stress_check_passed,
-                message=(
-                    "Commentary stress figures are consistent with calculated stress results."
-                    if stress_check_passed
-                    else stress_warning
-                    or "Commentary contains figures inconsistent with calculated stress results."
-                ),
-            )
-        )
-        errors.extend(stress_errors)
-        if stress_warning:
-            warnings.append(stress_warning)
 
+def _validate_stress_result_consistency(
+    checks: list[ValidationCheck],
+    errors: list[str],
+    warnings: list[str],
+    commentary: str,
+    stress_results,
+    percentage_tolerance: float,
+) -> None:
+    if not stress_results:
+        return
+    stress_errors, stress_warning = _stress_result_consistency_findings(
+        commentary,
+        stress_results,
+        percentage_tolerance,
+        value_tolerance=0.10,
+    )
+    stress_check_passed = not stress_errors and stress_warning is None
+    checks.append(
+        ValidationCheck(
+            name="stress_result_consistency",
+            passed=stress_check_passed,
+            message=(
+                "Commentary stress figures are consistent with calculated stress results."
+                if stress_check_passed
+                else stress_warning
+                or "Commentary contains figures inconsistent with calculated stress results."
+            ),
+        )
+    )
+    errors.extend(stress_errors)
+    if stress_warning:
+        warnings.append(stress_warning)
+
+
+def _validate_commentary_guardrails(
+    checks: list[ValidationCheck],
+    errors: list[str],
+    warnings: list[str],
+    commentary: str,
+) -> None:
     _run_check(
         checks,
         errors,
         "no_direct_trade_recommendations",
-        not _contains_direct_recommendation(commentary_text),
+        not _contains_direct_recommendation(commentary),
         "Commentary does not contain direct buy, sell, or hold recommendations.",
         "Commentary must not contain direct buy, sell, or hold recommendations.",
     )
 
-    has_assumptions_or_limitations = _contains_assumptions_or_limitations(commentary_text)
+    has_assumptions_or_limitations = _contains_assumptions_or_limitations(commentary)
     checks.append(
         ValidationCheck(
             name="includes_assumptions_or_limitations",
@@ -224,13 +293,20 @@ def validate_generated_report(
         checks,
         errors,
         "no_guaranteed_future_outcomes",
-        not _contains_certainty_claim(commentary_text),
+        not _contains_certainty_claim(commentary),
         "Commentary does not claim certainty or guaranteed future outcomes.",
         "Commentary must not claim certainty or guaranteed future outcomes.",
     )
 
+
+def _validate_methodology_grounding(
+    checks: list[ValidationCheck],
+    errors: list[str],
+    commentary: str,
+    methodology_notes,
+) -> None:
     unsupported_titles = _unsupported_methodology_references(
-        commentary_text,
+        commentary,
         methodology_notes,
     )
     _run_check(
@@ -243,13 +319,6 @@ def validate_generated_report(
             "Commentary cites methodology notes that were not retrieved: "
             f"{', '.join(unsupported_titles)}."
         ),
-    )
-
-    return ValidationResult(
-        passed=not errors,
-        checks=checks,
-        errors=errors,
-        warnings=warnings,
     )
 
 

@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
 from src.agent import _build_methodology_query
 from src.portfolio_loader import ExposureProfile
 from src.rag import load_methodology_docs
-from src.report_validator import ValidationResult
 from src.tool_executor import ToolExecutor
 from src.tool_registry import get_tool
+from src.workflow_types import (
+    ExecutionTraceEntry,
+    WorkflowPlan,
+    WorkflowResult,
+    WorkflowStep,
+)
 
 
 PFE_METHODOLOGY_TITLES = {
@@ -21,52 +25,11 @@ PFE_METHODOLOGY_TITLES = {
 }
 
 
-@dataclass
-class WorkflowStep:
-    name: str
-    description: str
-    status: str
-    tool_name: str
-    output_summary: str | None = None
-
-
-@dataclass
-class WorkflowPlan:
-    objective: str
-    steps: list[WorkflowStep]
-
-
 class Intent(str, Enum):
     PORTFOLIO_RISK = "portfolio_risk"
     METHODOLOGY_EXPLANATION = "methodology_explanation"
     STRESS_TEST = "stress_test"
     REPORT_VALIDATION = "report_validation"
-
-
-@dataclass
-class ExecutionTraceEntry:
-    step_number: int
-    tool_name: str
-    status: str
-    input_summary: str
-    output_summary: str
-    error: str | None
-
-
-@dataclass
-class WorkflowResult:
-    query: str
-    plan: WorkflowPlan
-    execution_trace: list[ExecutionTraceEntry]
-    active_modules: list[str]
-    parsed_portfolio: dict | None
-    risk_report: dict | None
-    pfe_result: dict | None
-    stress_test_results: list[dict]
-    methodology_notes: list[dict]
-    llm_commentary: str
-    validation_result: ValidationResult
-    warnings: list[str]
 
 
 def build_risk_workflow_plan(query: str) -> WorkflowPlan:

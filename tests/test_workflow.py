@@ -8,7 +8,8 @@ import pytest
 from src.report_validator import ValidationResult
 from src.tool_executor import ToolExecutor
 from src.tool_registry import list_registered_tools
-from src.workflow import WorkflowResult, build_risk_workflow_plan, run_risk_workflow
+from src.workflow import build_risk_workflow_plan, run_risk_workflow
+from src.workflow_types import WorkflowResult
 
 
 def _fake_generate_portfolio_risk_report(
