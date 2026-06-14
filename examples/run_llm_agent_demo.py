@@ -65,6 +65,23 @@ def main() -> None:
     print(f"95% Expected Shortfall: {metrics['expected_shortfall']:.2%}")
     print(f"Maximum drawdown: {metrics['max_drawdown']:.2%}")
     print()
+    if result.stress_test_results:
+        print("Stress Test Results")
+        for scenario in result.stress_test_results:
+            print(f"- Scenario: {scenario['scenario_name']}")
+            print(f"  Base portfolio value: {scenario['base_portfolio_value']:.2f}")
+            print(
+                "  Stressed portfolio value: "
+                f"{scenario['stressed_portfolio_value']:.2f}"
+            )
+            print(f"  Portfolio loss: {scenario['portfolio_loss_pct']:.2%}")
+            print("  Per-ticker contributions:")
+            for ticker, contribution in scenario["per_ticker_contributions"].items():
+                print(
+                    f"    {ticker}: "
+                    f"{contribution['portfolio_loss_contribution_pct']:.2%}"
+                )
+        print()
     print("Retrieved Methodology Notes")
     for doc in result.methodology_notes:
         print(f"- {doc['title']}")

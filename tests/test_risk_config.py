@@ -116,3 +116,62 @@ def test_direct_boolean_metric_flags_are_supported(tmp_path):
         "historical_var",
         "concentration",
     )
+
+
+def test_load_risk_config_with_stress_scenarios(tmp_path):
+    path = tmp_path / "risk_config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "stress_scenarios": [
+                    {
+                        "name": "Technology selloff",
+                        "equity_selloff_pct": 0.10,
+                        "tech_selloff_pct": 0.25,
+                        "rates_shock_bps": 75,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_risk_config(str(path))
+
+    assert len(config.stress_scenarios) == 1
+    scenario = config.stress_scenarios[0]
+    assert scenario.name == "Technology selloff"
+    assert scenario.equity_selloff_pct == 0.10
+    assert scenario.tech_selloff_pct == 0.25
+    assert scenario.rates_shock_bps == 75
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("equity_selloff_pct", 1.1, "equity_selloff_pct must be between 0 and 1"),
+        ("tech_selloff_pct", -0.1, "tech_selloff_pct must be between 0 and 1"),
+        ("rates_shock_bps", 1001, "rates_shock_bps must be between -1000 and 1000"),
+    ],
+)
+def test_invalid_stress_scenario_values_are_rejected(
+    tmp_path,
+    field,
+    value,
+    message,
+):
+    scenario = {
+        "name": "Invalid scenario",
+        "equity_selloff_pct": 0.10,
+        "tech_selloff_pct": 0.20,
+        "rates_shock_bps": 100,
+    }
+    scenario[field] = value
+    path = tmp_path / "risk_config.json"
+    path.write_text(
+        json.dumps({"stress_scenarios": [scenario]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=message):
+        load_risk_config(str(path))

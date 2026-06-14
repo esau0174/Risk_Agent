@@ -51,6 +51,7 @@ class WorkflowResult:
     execution_trace: list[ExecutionTraceEntry]
     parsed_portfolio: dict
     risk_report: dict
+    stress_test_results: list[dict]
     methodology_notes: list[dict]
     llm_commentary: str
     validation_result: ValidationResult
@@ -233,6 +234,8 @@ def run_risk_workflow(
             f"annualization factor {risk_config.returns.annualization_factor}."
         ),
     )
+    if risk_config.stress_scenarios:
+        _insert_step_after(plan, "calculate_risk_metrics", "run_stress_test")
 
     risk_report = _execute_traced(
         executor,
@@ -256,6 +259,27 @@ def run_risk_workflow(
         "calculate_risk_metrics",
         f"Calculated risk metrics: {metric_names}.",
     )
+
+    stress_test_results = []
+    if risk_config.stress_scenarios:
+        stress_test_results = _execute_traced(
+            executor,
+            execution_trace,
+            "run_stress_test",
+            (
+                f"Portfolio with {len(tickers)} holdings and "
+                f"{len(risk_config.stress_scenarios)} configured stress scenarios."
+            ),
+            lambda output: f"Calculated {len(output)} stress scenario results.",
+            tickers,
+            weights,
+            risk_config=risk_config,
+        )
+        _complete_step(
+            plan,
+            "run_stress_test",
+            f"Calculated {len(stress_test_results)} deterministic stress scenarios.",
+        )
 
     # TODO: Consider moving methodology loading behind a registered tool or provider.
     docs = load_methodology_docs()
@@ -373,6 +397,7 @@ def run_risk_workflow(
         execution_trace=execution_trace,
         parsed_portfolio=parsed_portfolio,
         risk_report=risk_report,
+        stress_test_results=stress_test_results,
         methodology_notes=methodology_notes,
         llm_commentary=commentary,
         validation_result=validation_result,
@@ -398,6 +423,20 @@ def _registered_step(tool_name: str) -> WorkflowStep:
         status="pending",
         tool_name=tool.name,
     )
+
+
+def _insert_step_after(
+    plan: WorkflowPlan,
+    preceding_step_name: str,
+    tool_name: str,
+) -> None:
+    if any(step.name == tool_name for step in plan.steps):
+        return
+    for index, step in enumerate(plan.steps):
+        if step.name == preceding_step_name:
+            plan.steps.insert(index + 1, _registered_step(tool_name))
+            return
+    raise ValueError(f"Workflow step not found: {preceding_step_name}")
 
 
 def _build_file_portfolio_workflow_plan() -> WorkflowPlan:

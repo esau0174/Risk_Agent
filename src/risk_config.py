@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -53,6 +54,14 @@ class ReportingConfig:
 
 
 @dataclass(frozen=True)
+class StressScenario:
+    name: str
+    equity_selloff_pct: float
+    tech_selloff_pct: float
+    rates_shock_bps: float
+
+
+@dataclass(frozen=True)
 class RiskConfig:
     """Validated calculation and reporting assumptions for a risk workflow."""
 
@@ -61,6 +70,7 @@ class RiskConfig:
     var: VarConfig = field(default_factory=VarConfig)
     risk_metrics: RiskMetricsConfig = field(default_factory=RiskMetricsConfig)
     reporting: ReportingConfig = field(default_factory=ReportingConfig)
+    stress_scenarios: tuple[StressScenario, ...] = ()
 
 
 def load_risk_config(config_file: str | None = None) -> RiskConfig:
@@ -85,6 +95,7 @@ def load_risk_config(config_file: str | None = None) -> RiskConfig:
     var = _config_section(payload, "var")
     risk_metrics = _config_section(payload, "risk_metrics")
     reporting = _config_section(payload, "reporting")
+    stress_scenarios = parse_stress_scenarios(payload.get("stress_scenarios", []))
 
     enabled_value = risk_metrics.get("enabled")
     if enabled_value is None:
@@ -133,6 +144,7 @@ def load_risk_config(config_file: str | None = None) -> RiskConfig:
                 "reporting.validate_commentary",
             ),
         ),
+        stress_scenarios=stress_scenarios,
     )
     _validate_config(config)
     return config
@@ -184,6 +196,69 @@ def _parse_enabled_metrics(value) -> tuple[str, ...]:
     return normalized
 
 
+def parse_stress_scenarios(value) -> tuple[StressScenario, ...]:
+    """Normalize and validate stress scenario dictionaries or dataclasses."""
+    if not isinstance(value, (list, tuple)):
+        raise ValueError("stress_scenarios must be a list.")
+
+    scenarios = []
+    for index, scenario in enumerate(value, start=1):
+        field_prefix = f"stress_scenarios[{index - 1}]"
+        if isinstance(scenario, StressScenario):
+            scenario = {
+                "name": scenario.name,
+                "equity_selloff_pct": scenario.equity_selloff_pct,
+                "tech_selloff_pct": scenario.tech_selloff_pct,
+                "rates_shock_bps": scenario.rates_shock_bps,
+            }
+        if not isinstance(scenario, dict):
+            raise ValueError(f"{field_prefix} must be an object.")
+
+        required_fields = {
+            "name",
+            "equity_selloff_pct",
+            "tech_selloff_pct",
+            "rates_shock_bps",
+        }
+        missing_fields = sorted(required_fields - set(scenario))
+        if missing_fields:
+            raise ValueError(
+                f"{field_prefix} is missing required fields: "
+                + ", ".join(missing_fields)
+                + "."
+            )
+
+        name = scenario["name"]
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(f"{field_prefix}.name must be a non-empty string.")
+
+        scenarios.append(
+            StressScenario(
+                name=name.strip(),
+                equity_selloff_pct=_bounded_number(
+                    scenario["equity_selloff_pct"],
+                    f"{field_prefix}.equity_selloff_pct",
+                    minimum=0.0,
+                    maximum=1.0,
+                ),
+                tech_selloff_pct=_bounded_number(
+                    scenario["tech_selloff_pct"],
+                    f"{field_prefix}.tech_selloff_pct",
+                    minimum=0.0,
+                    maximum=1.0,
+                ),
+                rates_shock_bps=_bounded_number(
+                    scenario["rates_shock_bps"],
+                    f"{field_prefix}.rates_shock_bps",
+                    minimum=-1000.0,
+                    maximum=1000.0,
+                ),
+            )
+        )
+
+    return tuple(scenarios)
+
+
 def _confidence_level(value) -> float:
     try:
         confidence_level = float(value)
@@ -194,6 +269,20 @@ def _confidence_level(value) -> float:
         raise ValueError("var.confidence_level must be between 0 and 1.")
 
     return confidence_level
+
+
+def _bounded_number(value, field_name: str, minimum: float, maximum: float) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"{field_name} must be numeric.")
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be numeric.") from exc
+    if not math.isfinite(number) or not minimum <= number <= maximum:
+        raise ValueError(
+            f"{field_name} must be between {minimum:g} and {maximum:g}."
+        )
+    return number
 
 
 def _positive_integer(value, field_name: str) -> int:

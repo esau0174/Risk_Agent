@@ -15,6 +15,7 @@ from src.rag import retrieve_relevant_methodology
 from src.report_validator import validate_generated_report
 from src.risk_config import load_risk_config
 from src.risk_report import generate_portfolio_risk_report
+from src.stress_testing import run_stress_test
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,12 @@ _REGISTERED_TOOLS: tuple[RiskTool, ...] = (
         description="Compute portfolio returns and historical risk metrics.",
         callable_name="src.risk_report.generate_portfolio_risk_report",
         handler=generate_portfolio_risk_report,
+    ),
+    RiskTool(
+        name="run_stress_test",
+        description="Apply deterministic equity, technology, and rates stress scenarios.",
+        callable_name="src.stress_testing.run_stress_test",
+        handler=run_stress_test,
     ),
     RiskTool(
         name="retrieve_methodology",

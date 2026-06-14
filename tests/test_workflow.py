@@ -260,6 +260,70 @@ def test_run_risk_workflow_loads_config_file_through_executor(tmp_path):
     assert captured["risk_config"].var.confidence_level == 0.99
 
 
+def test_workflow_runs_configured_stress_scenarios(tmp_path):
+    config_path = tmp_path / "risk_config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "stress_scenarios": [
+                    {
+                        "name": "Combined selloff",
+                        "equity_selloff_pct": 0.10,
+                        "tech_selloff_pct": 0.20,
+                        "rates_shock_bps": 100,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    tools = [
+        replace(tool, handler=_fake_generate_portfolio_risk_report)
+        if tool.name == "calculate_risk_metrics"
+        else tool
+        for tool in list_registered_tools()
+    ]
+
+    result = run_risk_workflow(
+        "40% SPY, 30% QQQ, 20% NVDA, 10% TLT",
+        use_llm=False,
+        tool_executor=ToolExecutor(tools),
+        config_file=str(config_path),
+    )
+
+    plan_names = [step.name for step in result.plan.steps]
+    trace_names = [entry.tool_name for entry in result.execution_trace]
+    assert plan_names.index("run_stress_test") == plan_names.index(
+        "calculate_risk_metrics"
+    ) + 1
+    assert trace_names.index("run_stress_test") == trace_names.index(
+        "calculate_risk_metrics"
+    ) + 1
+    assert len(result.stress_test_results) == 1
+    assert result.stress_test_results[0]["scenario_name"] == "Combined selloff"
+
+
+def test_workflow_skips_stress_test_without_scenarios():
+    tools = [
+        replace(tool, handler=_fake_generate_portfolio_risk_report)
+        if tool.name == "calculate_risk_metrics"
+        else tool
+        for tool in list_registered_tools()
+    ]
+
+    result = run_risk_workflow(
+        "40% SPY, 60% QQQ",
+        use_llm=False,
+        tool_executor=ToolExecutor(tools),
+    )
+
+    assert result.stress_test_results == []
+    assert "run_stress_test" not in [step.name for step in result.plan.steps]
+    assert "run_stress_test" not in [
+        entry.tool_name for entry in result.execution_trace
+    ]
+
+
 def test_validation_failure_regenerates_commentary_once_and_revalidates():
     validation_results = iter(
         [

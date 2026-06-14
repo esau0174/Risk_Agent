@@ -9,6 +9,7 @@ EXPECTED_TOOL_NAMES = [
     "validate_portfolio",
     "load_risk_config",
     "calculate_risk_metrics",
+    "run_stress_test",
     "retrieve_methodology",
     "generate_commentary",
     "regenerate_commentary_with_validation_errors",

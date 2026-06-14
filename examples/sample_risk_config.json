@@ -24,5 +24,13 @@
     "include_methodology_notes": true,
     "include_llm_commentary": true,
     "validate_commentary": true
-  }
+  },
+  "stress_scenarios": [
+    {
+      "name": "Equity and rates selloff",
+      "equity_selloff_pct": 0.15,
+      "tech_selloff_pct": 0.25,
+      "rates_shock_bps": 100
+    }
+  ]
 }
