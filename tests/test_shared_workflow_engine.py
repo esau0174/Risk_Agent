@@ -4,8 +4,7 @@ from dataclasses import replace
 
 from src.tool_executor import ToolExecutor
 from src.tool_registry import list_registered_tools
-from src.workflow import run_risk_workflow
-from src.workflow_types import WorkflowPlan, WorkflowResult
+from src.workflow import WorkflowPlan, WorkflowResult, run_risk_workflow
 
 
 def _fake_market_risk_report(

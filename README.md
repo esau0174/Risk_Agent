@@ -84,8 +84,12 @@ Risk_Agent/
 |   |-- risk_report.py
 |   |-- stress_testing.py
 |   |-- tool_registry.py
-|   |-- workflow.py
-|   `-- workflow_types.py
+|   `-- workflow/
+|       |-- __init__.py
+|       |-- execution.py
+|       |-- engine.py
+|       |-- planner.py
+|       `-- types.py
 |-- tests/
 |   |-- test_agent.py
 |   |-- test_portfolio.py

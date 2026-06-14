@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from src.tool_registry import RiskTool
-from src.workflow_types import ExecutionTraceEntry, WorkflowPlan
+from src.workflow import ExecutionTraceEntry, WorkflowPlan
 
 
 MODULE_LABELS = {
