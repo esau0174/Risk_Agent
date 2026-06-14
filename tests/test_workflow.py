@@ -301,6 +301,53 @@ def test_workflow_runs_configured_stress_scenarios(tmp_path):
     ) + 1
     assert len(result.stress_test_results) == 1
     assert result.stress_test_results[0]["scenario_name"] == "Combined selloff"
+    assert "Stress Scenario Analysis" in result.llm_commentary
+
+
+def test_workflow_passes_stress_results_to_commentary_tool(tmp_path):
+    config_path = tmp_path / "risk_config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "stress_scenarios": [
+                    {
+                        "name": "Equity selloff",
+                        "equity_selloff_pct": 0.10,
+                        "tech_selloff_pct": 0.20,
+                        "rates_shock_bps": 100,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    captured = {}
+
+    def capture_commentary(*args, **kwargs):
+        captured["stress_results"] = kwargs.get("stress_results")
+        from src.agent import generate_risk_commentary
+
+        return generate_risk_commentary(*args, **kwargs)
+
+    replacements = {
+        "calculate_risk_metrics": _fake_generate_portfolio_risk_report,
+        "generate_commentary": capture_commentary,
+    }
+    tools = [
+        replace(tool, handler=replacements[tool.name])
+        if tool.name in replacements
+        else tool
+        for tool in list_registered_tools()
+    ]
+
+    run_risk_workflow(
+        "40% SPY, 60% QQQ",
+        use_llm=False,
+        tool_executor=ToolExecutor(tools),
+        config_file=str(config_path),
+    )
+
+    assert captured["stress_results"][0]["scenario_name"] == "Equity selloff"
 
 
 def test_workflow_skips_stress_test_without_scenarios():

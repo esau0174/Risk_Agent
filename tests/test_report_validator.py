@@ -36,6 +36,21 @@ def _safe_commentary() -> str:
     )
 
 
+def _stress_results() -> list[dict]:
+    return [
+        {
+            "scenario_name": "Combined selloff",
+            "base_portfolio_value": 100.0,
+            "stressed_portfolio_value": 82.5,
+            "portfolio_loss_pct": 0.175,
+            "per_ticker_contributions": {
+                "SPY": {"portfolio_loss_contribution_pct": 0.04},
+                "QQQ": {"portfolio_loss_contribution_pct": 0.06},
+            },
+        }
+    ]
+
+
 def test_valid_numerical_report_and_safe_commentary_pass():
     result = validate_generated_report(
         _valid_parsed_portfolio(),
@@ -323,3 +338,129 @@ def test_var_and_expected_shortfall_in_separate_sentences_do_not_cross_match():
     )
 
     assert result.passed is True
+
+
+def test_matching_stress_loss_and_values_pass():
+    commentary = (
+        "Stress Scenario Analysis\n"
+        "Combined selloff: portfolio loss 17.50%, stressed portfolio value 82.50, "
+        "with the main contributions from QQQ (6.00%) and SPY (4.00%). "
+        "Assumptions and limitations: deterministic proxy stress test only; not "
+        "investment advice."
+    )
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        commentary,
+        stress_results=_stress_results(),
+    )
+
+    assert result.passed is True
+    assert any(
+        check.name == "stress_result_consistency" and check.passed
+        for check in result.checks
+    )
+
+
+def test_mismatched_stress_loss_fails():
+    commentary = (
+        "Stress Scenario Analysis: Combined selloff has a portfolio loss of 25.00% "
+        "and stressed portfolio value of 82.50. Assumptions and limitations apply; "
+        "not investment advice."
+    )
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        commentary,
+        stress_results=_stress_results(),
+    )
+
+    assert result.passed is False
+    assert any(
+        "portfolio loss mismatch: expected 17.50%, found 25.00%" in error
+        for error in result.errors
+    )
+
+
+def test_mismatched_stressed_portfolio_value_fails():
+    commentary = (
+        "Under the Combined selloff stress scenario, portfolio loss is 17.50% and "
+        "stressed portfolio value is 75.00. Assumptions and limitations apply; not "
+        "investment advice."
+    )
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        commentary,
+        stress_results=_stress_results(),
+    )
+
+    assert result.passed is False
+    assert any(
+        "stressed portfolio value mismatch: expected 82.50, found 75.00" in error
+        for error in result.errors
+    )
+
+
+def test_mismatched_stress_ticker_contribution_fails():
+    commentary = (
+        "Stress Scenario Analysis: Combined selloff has a portfolio loss of 17.50%, "
+        "stressed portfolio value of 82.50, and contributions from QQQ (9.00%) and "
+        "SPY (4.00%). Assumptions and limitations apply; not investment advice."
+    )
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        commentary,
+        stress_results=_stress_results(),
+    )
+
+    assert result.passed is False
+    assert any(
+        "QQQ contribution mismatch: expected 6.00%, found 9.00%" in error
+        for error in result.errors
+    )
+
+
+def test_no_stress_results_do_not_affect_validation():
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        _safe_commentary(),
+        stress_results=[],
+    )
+
+    assert result.passed is True
+    assert not result.warnings
+    assert any(
+        check.name == "stress_result_consistency" and check.passed
+        for check in result.checks
+    )
+
+
+def test_stress_results_without_stress_commentary_produce_warning():
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        _safe_commentary(),
+        stress_results=_stress_results(),
+    )
+
+    assert result.passed is True
+    assert "Stress results are available, but commentary omits stress analysis." in (
+        result.warnings
+    )
+    assert any(
+        check.name == "stress_result_consistency" and not check.passed
+        for check in result.checks
+    )

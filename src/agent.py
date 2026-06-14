@@ -146,8 +146,9 @@ def _generate_risk_commentary(
     query: str,
     risk_report: dict,
     methodology_docs: list[dict],
+    stress_results: list[dict] | None = None,
 ) -> str:
-    facts = _build_commentary_facts(risk_report, methodology_docs)
+    facts = _build_commentary_facts(risk_report, methodology_docs, stress_results)
     response = client.responses.create(
         model=model,
         input=[
@@ -171,7 +172,12 @@ def _generate_risk_commentary(
                     "observations in the lookback window. Do not describe VaR as a forward-looking "
                     "probability of future loss. Describe Expected Shortfall as the average loss "
                     "conditional on losses exceeding the VaR threshold. Avoid vague phrases such as "
-                    "'worst-case scenarios'. "
+                    "'worst-case scenarios'. Present all risk metric and loss decimals as percentages, "
+                    "using the supplied display percentages rather than raw decimal values. If stress "
+                    "results are supplied, add a dedicated 'Stress Scenario Analysis' section covering "
+                    "each scenario name, portfolio loss percentage, stressed portfolio value, and main "
+                    "per-ticker contributors. State that the stress test is a deterministic proxy and "
+                    "not a full factor model. "
                     "When citing methodology, cite note titles exactly in plain text, for example "
                     "'Methodology reference: Historical VaR'. Do not invent citations or cite external "
                     "sources."
@@ -203,6 +209,7 @@ def generate_risk_commentary(
     risk_report: dict,
     methodology_docs: list[dict],
     use_llm: bool = True,
+    stress_results: list[dict] | None = None,
 ) -> str:
     """Generate LLM commentary or a deterministic offline fallback."""
     if use_llm:
@@ -215,9 +222,10 @@ def generate_risk_commentary(
             query,
             risk_report,
             methodology_docs,
+            stress_results,
         )
 
-    return _build_fallback_commentary(risk_report, methodology_docs)
+    return _build_fallback_commentary(risk_report, methodology_docs, stress_results)
 
 
 def regenerate_risk_commentary_with_validation_errors(
@@ -227,15 +235,20 @@ def regenerate_risk_commentary_with_validation_errors(
     validation_warnings: list[str],
     methodology_docs: list[dict],
     use_llm: bool = True,
+    stress_results: list[dict] | None = None,
 ) -> str:
     """Regenerate commentary once using deterministic validation feedback."""
     if not use_llm:
-        return _build_fallback_commentary(risk_report, methodology_docs)
+        return _build_fallback_commentary(
+            risk_report,
+            methodology_docs,
+            stress_results,
+        )
 
     load_dotenv()
     client = _create_openai_client()
     model = os.getenv("OPENAI_MODEL", DEFAULT_MODEL)
-    facts = _build_commentary_facts(risk_report, methodology_docs)
+    facts = _build_commentary_facts(risk_report, methodology_docs, stress_results)
     response = client.responses.create(
         model=model,
         input=[
@@ -246,7 +259,10 @@ def regenerate_risk_commentary_with_validation_errors(
                     "validation error and warning. Use only the supplied calculated facts and "
                     "retrieved methodology notes. Do not invent metrics or citations, make "
                     "investment recommendations, or claim guaranteed outcomes. Preserve clear "
-                    "assumptions and limitations. End with the exact disclaimer: 'This commentary is "
+                    "assumptions and limitations. Present metric and stress loss decimals as percentages. "
+                    "If stress results are supplied, preserve a dedicated 'Stress Scenario Analysis' "
+                    "section and its deterministic proxy limitation. End with the exact disclaimer: "
+                    "'This commentary is "
                     "for analytical demonstration only and does not constitute investment advice.'"
                 ),
             },
@@ -276,12 +292,15 @@ def regenerate_risk_commentary_with_validation_errors(
 def _build_commentary_facts(
     risk_report: dict,
     methodology_docs: list[dict] | None = None,
+    stress_results: list[dict] | None = None,
 ) -> dict:
     metadata = risk_report["metadata"]
     tickers = metadata["tickers"]
     weights = metadata["weights"]
     largest_index = max(range(len(weights)), key=weights.__getitem__)
     methodology_docs = methodology_docs or []
+    stress_results = stress_results or []
+    metrics = risk_report["risk_metrics"]
 
     return {
         "tickers": tickers,
@@ -289,7 +308,10 @@ def _build_commentary_facts(
         "start_date": metadata["start_date"],
         "end_date": metadata["end_date"],
         "confidence_level": metadata["confidence_level"],
-        "risk_metrics": risk_report["risk_metrics"],
+        "risk_metrics": metrics,
+        "risk_metrics_display": {
+            name: f"{value:.2%}" for name, value in metrics.items()
+        },
         "latest_cumulative_return": risk_report["latest_cumulative_return"],
         "number_of_observations": risk_report["number_of_observations"],
         "largest_weight_concentration": {
@@ -297,6 +319,17 @@ def _build_commentary_facts(
             "weight": weights[largest_index],
         },
         "composition_notes": _infer_composition_notes(tickers),
+        "stress_results": [
+            {
+                **result,
+                "portfolio_loss_display": f"{result['portfolio_loss_pct']:.2%}",
+                "per_ticker_contribution_display": {
+                    ticker: f"{details['portfolio_loss_contribution_pct']:.2%}"
+                    for ticker, details in result["per_ticker_contributions"].items()
+                },
+            }
+            for result in stress_results
+        ],
         "retrieved_methodology": [
             {
                 "title": doc["title"],
@@ -371,7 +404,11 @@ def _normalize_weights(weights: Sequence[float]) -> list[float]:
     return normalized
 
 
-def _build_fallback_commentary(risk_report: dict, methodology_docs: list[dict]) -> str:
+def _build_fallback_commentary(
+    risk_report: dict,
+    methodology_docs: list[dict],
+    stress_results: list[dict] | None = None,
+) -> str:
     metadata = risk_report["metadata"]
     metrics = risk_report["risk_metrics"]
     tickers = metadata["tickers"]
@@ -383,6 +420,8 @@ def _build_fallback_commentary(risk_report: dict, methodology_docs: list[dict]) 
     if methodology_titles:
         references = " Methodology references: " + ", ".join(methodology_titles) + "."
 
+    stress_section = _build_fallback_stress_section(stress_results or [])
+
     return (
         f"The workflow analyzed {', '.join(tickers)} using historical data since "
         f"{metadata['start_date']}. Annualized volatility is "
@@ -393,9 +432,40 @@ def _build_fallback_commentary(risk_report: dict, methodology_docs: list[dict]) 
         f"{metrics['expected_shortfall']:.2%}; it estimates the average loss conditional "
         "on losses exceeding the VaR threshold. Maximum drawdown is "
         f"{metrics['max_drawdown']:.2%}. The largest single position is "
-        f"{tickers[largest_index]} at {weights[largest_index]:.2%}. Assumptions and "
+        f"{tickers[largest_index]} at {weights[largest_index]:.2%}."
+        f"{stress_section}"
+        "\n\nAssumptions and "
         "limitations: this fallback commentary is based only on calculated metrics, "
         "historical data, and local methodology retrieval. This commentary is for "
         "analytical demonstration only and does not constitute investment advice."
         f"{references}"
+    )
+
+
+def _build_fallback_stress_section(stress_results: list[dict]) -> str:
+    if not stress_results:
+        return ""
+
+    scenario_summaries = []
+    for result in stress_results:
+        contributors = sorted(
+            result["per_ticker_contributions"].items(),
+            key=lambda item: item[1]["portfolio_loss_contribution_pct"],
+            reverse=True,
+        )
+        contributor_summary = ", ".join(
+            f"{ticker} ({details['portfolio_loss_contribution_pct']:.2%})"
+            for ticker, details in contributors[:3]
+        )
+        scenario_summaries.append(
+            f"{result['scenario_name']}: portfolio loss "
+            f"{result['portfolio_loss_pct']:.2%}, stressed portfolio value "
+            f"{result['stressed_portfolio_value']:.2f}, with the main loss "
+            f"contributions from {contributor_summary}."
+        )
+
+    return (
+        "\n\nStress Scenario Analysis\n"
+        + " ".join(scenario_summaries)
+        + " This is a deterministic proxy stress test, not a full factor model."
     )

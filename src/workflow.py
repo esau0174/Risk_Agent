@@ -316,6 +316,11 @@ def run_risk_workflow(
         risk_report,
         methodology_notes,
         use_llm=use_llm,
+        **(
+            {"stress_results": stress_test_results}
+            if stress_test_results
+            else {}
+        ),
     )
     if use_llm:
         commentary_summary = "Generated LLM commentary from calculated facts and retrieved methodology."
@@ -338,6 +343,11 @@ def run_risk_workflow(
         risk_report,
         methodology_notes,
         commentary,
+        **(
+            {"stress_results": stress_test_results}
+            if stress_test_results
+            else {}
+        ),
     )
 
     if not validation_result.passed:
@@ -360,6 +370,11 @@ def run_risk_workflow(
             initial_warnings,
             methodology_notes,
             use_llm=use_llm,
+            **(
+                {"stress_results": stress_test_results}
+                if stress_test_results
+                else {}
+            ),
         )
         warnings.append(
             "Initial commentary failed validation; commentary was regenerated once."
@@ -377,6 +392,11 @@ def run_risk_workflow(
             risk_report,
             methodology_notes,
             commentary,
+            **(
+                {"stress_results": stress_test_results}
+                if stress_test_results
+                else {}
+            ),
         )
 
     warnings.extend(validation_result.warnings)
