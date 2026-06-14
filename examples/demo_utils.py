@@ -15,14 +15,14 @@ MODULE_LABELS = {
 
 def print_input_summary(
     query: str,
-    portfolio_file: str | None = None,
+    data_file: str | None = None,
     config_file: str | None = None,
     active_modules: Iterable[str] | None = None,
 ) -> None:
     print("Input Summary")
     print(f"- Query: {query}")
-    if portfolio_file:
-        print(f"- Portfolio file: {portfolio_file}")
+    if data_file:
+        print(f"- Data file: {data_file}")
     if config_file:
         print(f"- Risk config: {config_file}")
     if active_modules:

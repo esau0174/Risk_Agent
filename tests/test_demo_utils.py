@@ -59,6 +59,8 @@ def test_shared_demo_helpers_render_common_sections(capsys):
 
     output = capsys.readouterr().out
     assert "Input Summary" in output
+    assert "Data file: portfolio.csv" in output
+    assert "Portfolio file:" not in output
     assert "Active modules: Shared, Market Risk" in output
     assert "Registered Risk Tools" in output
     assert "Shared:" in output

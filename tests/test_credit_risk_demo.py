@@ -13,6 +13,8 @@ def test_credit_risk_demo_exists_with_expected_title_and_shared_workflow():
     assert "Counterparty Exposure / PFE Analysis" in source
     assert "Credit Risk Results / PFE Metrics" in source
     assert "from examples.demo_utils import" in source
+    assert "data_file=data_file" in source
+    assert "portfolio_file=" not in source
     assert "run_risk_workflow" in source
     assert not Path("examples/run_pfe_demo.py").exists()
 

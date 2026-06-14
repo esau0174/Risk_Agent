@@ -15,6 +15,8 @@ def test_market_risk_demo_uses_shared_formatting_and_result_sections():
     assert "print_execution_trace" in source
     assert "print_methodology_notes" in source
     assert "print_validation_result" in source
+    assert "data_file=data_file" in source
+    assert "portfolio_file=" not in source
     assert 'print("Market Risk Results")' in source
     assert 'print("Stress Test Results")' in source
 

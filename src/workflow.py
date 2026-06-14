@@ -121,29 +121,34 @@ def run_risk_workflow(
     tool_executor: ToolExecutor | None = None,
     portfolio_file: str | None = None,
     config_file: str | None = None,
+    data_file: str | None = None,
 ) -> WorkflowResult:
     """Run the deterministic multi-step risk workflow."""
+    if data_file is not None and portfolio_file is not None:
+        raise ValueError("Provide either data_file or portfolio_file, not both.")
+    resolved_data_file = data_file if data_file is not None else portfolio_file
+
     plan = (
         _build_file_portfolio_workflow_plan()
-        if portfolio_file is not None
+        if resolved_data_file is not None
         else build_risk_workflow_plan(query)
     )
     warnings: list[str] = []
     execution_trace: list[ExecutionTraceEntry] = []
     executor = tool_executor or ToolExecutor()
 
-    if portfolio_file is not None:
+    if resolved_data_file is not None:
         loaded_portfolio = _execute_traced(
             executor,
             execution_trace,
             "load_portfolio_file",
-            f"Structured portfolio file: {portfolio_file}.",
+            f"Structured data file: {resolved_data_file}.",
             lambda output: (
                 f"Loaded {len(output.exposures)} exposure profile rows."
                 if isinstance(output, ExposureProfile)
                 else f"Loaded {len(output['tickers'])} tickers from file."
             ),
-            portfolio_file,
+            resolved_data_file,
         )
         if isinstance(loaded_portfolio, ExposureProfile):
             plan = _build_exposure_profile_workflow_plan()
@@ -474,7 +479,7 @@ def _insert_step_after(
 
 def _build_file_portfolio_workflow_plan() -> WorkflowPlan:
     return WorkflowPlan(
-        objective="Analyze risk for a structured portfolio file using a natural-language instruction.",
+        objective="Analyze risk for a structured data file using a natural-language instruction.",
         steps=[
             _registered_step("load_portfolio_file"),
             _registered_step("validate_portfolio"),

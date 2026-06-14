@@ -21,10 +21,10 @@ from examples.demo_utils import (
 
 def main() -> None:
     query = "Analyze the counterparty exposure profile and summarize PFE concentration."
-    portfolio_file = "examples/sample_exposure_profile.csv"
+    data_file = "examples/sample_exposure_profile.csv"
     result = run_risk_workflow(
         query,
-        portfolio_file=portfolio_file,
+        data_file=data_file,
         use_llm=False,
     )
 
@@ -34,7 +34,7 @@ def main() -> None:
     print()
     print_input_summary(
         query,
-        portfolio_file,
+        data_file,
         active_modules=result.active_modules,
     )
     print_registered_tools_by_module(list_registered_tools())

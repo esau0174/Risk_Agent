@@ -204,6 +204,45 @@ def test_run_risk_workflow_uses_portfolio_file_and_skips_parser(tmp_path):
         "tickers": ["SPY", "QQQ"],
         "weights": [0.6, 0.4],
     }
+    assert result.execution_trace[0].input_summary.startswith("Structured data file:")
+
+
+def test_run_risk_workflow_accepts_preferred_data_file_name(tmp_path):
+    portfolio_path = tmp_path / "portfolio.csv"
+    portfolio_path.write_text("ticker,weight\nSPY,60%\nQQQ,40%\n", encoding="utf-8")
+    tools = [
+        replace(tool, handler=_fake_generate_portfolio_risk_report)
+        if tool.name == "calculate_risk_metrics"
+        else tool
+        for tool in list_registered_tools()
+    ]
+
+    result = run_risk_workflow(
+        "Analyze market risk.",
+        use_llm=False,
+        tool_executor=ToolExecutor(tools),
+        data_file=str(portfolio_path),
+    )
+
+    assert result.parsed_portfolio == {
+        "tickers": ["SPY", "QQQ"],
+        "weights": [0.6, 0.4],
+    }
+    assert result.execution_trace[0].tool_name == "load_portfolio_file"
+    assert result.execution_trace[0].input_summary.startswith("Structured data file:")
+
+
+def test_run_risk_workflow_rejects_both_file_parameter_names():
+    with pytest.raises(
+        ValueError,
+        match="Provide either data_file or portfolio_file, not both",
+    ):
+        run_risk_workflow(
+            "Analyze risk.",
+            data_file="data.csv",
+            portfolio_file="legacy.csv",
+            use_llm=False,
+        )
 
 
 def test_natural_language_workflow_still_uses_parser():

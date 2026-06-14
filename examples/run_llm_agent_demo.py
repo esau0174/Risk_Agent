@@ -29,19 +29,19 @@ def main() -> None:
         return
 
     query = "Analyze the uploaded portfolio for downside risk and concentration risk."
-    portfolio_file = "examples/sample_portfolio.csv"
+    data_file = "examples/sample_portfolio.csv"
     config_file = "examples/sample_risk_config.json"
 
     result = run_risk_workflow(
         query,
         use_llm=True,
-        portfolio_file=portfolio_file,
+        data_file=data_file,
         config_file=config_file,
     )
 
     print("FinRisk Agent - Agentic Risk Workflow Demo")
     print("==========================================")
-    print_input_summary(query, portfolio_file, config_file, result.active_modules)
+    print_input_summary(query, data_file, config_file, result.active_modules)
     print_registered_tools_by_module(list_registered_tools())
     print_workflow_plan(result.plan)
     print_execution_trace(result.execution_trace)
