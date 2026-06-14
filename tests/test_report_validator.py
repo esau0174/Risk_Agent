@@ -471,9 +471,23 @@ def test_no_stress_results_do_not_affect_validation():
 
     assert result.passed is True
     assert not result.warnings
+    assert not any(
+        check.name == "stress_result_consistency" for check in result.checks
+    )
+
+
+def test_no_pfe_result_omits_pfe_consistency_check():
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        _safe_commentary(),
+    )
+
+    assert result.passed is True
+    assert not any(check.name == "pfe_result_consistency" for check in result.checks)
     assert any(
-        check.name == "stress_result_consistency" and check.passed
-        for check in result.checks
+        check.name == "commentary_metric_consistency" for check in result.checks
     )
 
 
@@ -517,6 +531,9 @@ def test_matching_pfe_commentary_passes_consistency_validation():
     assert any(
         check.name == "pfe_result_consistency" and check.passed
         for check in result.checks
+    )
+    assert not any(
+        check.name == "commentary_metric_consistency" for check in result.checks
     )
 
 

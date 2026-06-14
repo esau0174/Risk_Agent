@@ -5,6 +5,7 @@ from src.tool_registry import RiskTool
 def test_successful_tool_execution_returns_output_and_metadata():
     tool = RiskTool(
         name="add",
+        module="shared",
         description="Add two numbers.",
         callable_name="tests.add",
         handler=lambda left, right: left + right,
@@ -16,7 +17,10 @@ def test_successful_tool_execution_returns_output_and_metadata():
     assert result.status == "success"
     assert result.output == 5
     assert result.error is None
-    assert result.metadata == {"callable_name": "tests.add"}
+    assert result.metadata == {
+        "callable_name": "tests.add",
+        "module": "shared",
+    }
 
 
 def test_unknown_tool_name_returns_failed_result():
@@ -35,6 +39,7 @@ def test_tool_execution_failure_returns_error_details():
 
     tool = RiskTool(
         name="failing_tool",
+        module="shared",
         description="Always fails.",
         callable_name="tests.failing_tool",
         handler=failing_tool,
@@ -46,4 +51,7 @@ def test_tool_execution_failure_returns_error_details():
     assert result.status == "failed"
     assert result.output is None
     assert result.error == "ValueError: calculation failed"
-    assert result.metadata == {"callable_name": "tests.failing_tool"}
+    assert result.metadata == {
+        "callable_name": "tests.failing_tool",
+        "module": "shared",
+    }

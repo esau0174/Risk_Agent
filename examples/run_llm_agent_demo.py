@@ -12,6 +12,14 @@ if str(REPO_ROOT) not in sys.path:
 
 from src.tool_registry import list_registered_tools
 from src.workflow import run_risk_workflow
+from examples.demo_utils import (
+    print_execution_trace,
+    print_input_summary,
+    print_methodology_notes,
+    print_registered_tools_by_module,
+    print_validation_result,
+    print_workflow_plan,
+)
 
 
 def main() -> None:
@@ -33,32 +41,15 @@ def main() -> None:
 
     print("FinRisk Agent - Agentic Risk Workflow Demo")
     print("==========================================")
-    print(f"Original query: {result.query}")
-    print()
-    print("Registered Risk Tools")
-    for tool in list_registered_tools():
-        print(f"- {tool.name}: {tool.description}")
-    print()
-    print("Agentic Workflow Plan")
-    for step in result.plan.steps:
-        print(
-            f"- {step.name} [{step.tool_name}]: "
-            f"{step.status} - {step.output_summary}"
-        )
-    print()
-    print("Execution Trace")
-    for entry in result.execution_trace:
-        print(f"- Step {entry.step_number}: {entry.tool_name} [{entry.status}]")
-        print(f"  Input: {entry.input_summary}")
-        print(f"  Output: {entry.output_summary}")
-        if entry.error:
-            print(f"  Error: {entry.error}")
-    print()
+    print_input_summary(query, portfolio_file, config_file, result.active_modules)
+    print_registered_tools_by_module(list_registered_tools())
+    print_workflow_plan(result.plan)
+    print_execution_trace(result.execution_trace)
     print("Parsed portfolio:")
     print(f"Tickers: {result.parsed_portfolio['tickers']}")
     print(f"Weights: {result.parsed_portfolio['weights']}")
     print()
-    print("Risk metrics:")
+    print("Market Risk Results")
     metrics = result.risk_report["risk_metrics"]
     print(f"Annualized volatility: {metrics['annualized_volatility']:.2%}")
     print(f"95% historical VaR: {metrics['historical_var']:.2%}")
@@ -82,29 +73,11 @@ def main() -> None:
                     f"{contribution['portfolio_loss_contribution_pct']:.2%}"
                 )
         print()
-    print("Retrieved Methodology Notes")
-    for doc in result.methodology_notes:
-        print(f"- {doc['title']}")
-    print()
-    print("LLM commentary:")
+    print_methodology_notes(result.methodology_notes)
+    print("Commentary")
     print(result.llm_commentary)
     print()
-    print("Report Validation")
-    validation_status = "PASSED" if result.validation_result.passed else "FAILED"
-    print(f"Overall validation status: {validation_status}")
-    for check in result.validation_result.checks:
-        check_status = "PASSED" if check.passed else "FAILED"
-        print(f"- {check.name}: {check_status} - {check.message}")
-
-    if result.validation_result.warnings:
-        print("Warnings:")
-        for warning in result.validation_result.warnings:
-            print(f"- {warning}")
-
-    if result.validation_result.errors:
-        print("Errors:")
-        for error in result.validation_result.errors:
-            print(f"- {error}")
+    print_validation_result(result.validation_result)
 
 
 if __name__ == "__main__":

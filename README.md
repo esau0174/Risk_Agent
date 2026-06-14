@@ -69,6 +69,7 @@ Risk_Agent/
 |   |-- max_drawdown.md
 |   `-- model_limitations.md
 |-- examples/
+|   |-- run_credit_risk_demo.py
 |   |-- run_llm_agent_demo.py
 |   |-- run_phase1_demo.py
 |   `-- run_text_query_demo.py
@@ -145,6 +146,12 @@ Run the LLM agent demo:
 
 ```bash
 python examples/run_llm_agent_demo.py
+```
+
+Run the counterparty exposure / PFE credit risk demo:
+
+```bash
+python examples/run_credit_risk_demo.py
 ```
 
 The LLM demo requires `OPENAI_API_KEY` to be set. If no key is available, the demo exits without calling the OpenAI API.

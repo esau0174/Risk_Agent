@@ -74,6 +74,8 @@ def test_market_and_pfe_files_use_the_same_workflow_engine(tmp_path):
     assert isinstance(pfe_result, WorkflowResult)
     assert isinstance(market_result.plan, WorkflowPlan)
     assert isinstance(pfe_result.plan, WorkflowPlan)
+    assert market_result.active_modules == ["shared", "market_risk"]
+    assert pfe_result.active_modules == ["shared", "credit_risk"]
     assert market_result.execution_trace
     assert pfe_result.execution_trace
 

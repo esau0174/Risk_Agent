@@ -58,6 +58,7 @@ class WorkflowResult:
     query: str
     plan: WorkflowPlan
     execution_trace: list[ExecutionTraceEntry]
+    active_modules: list[str]
     parsed_portfolio: dict | None
     risk_report: dict | None
     pfe_result: dict | None
@@ -447,6 +448,7 @@ def run_risk_workflow(
         query=query,
         plan=plan,
         execution_trace=execution_trace,
+        active_modules=infer_active_modules(execution_trace),
         parsed_portfolio=parsed_portfolio,
         risk_report=risk_report,
         pfe_result=None,
@@ -466,6 +468,21 @@ def _complete_step(plan: WorkflowPlan, step_name: str, output_summary: str) -> N
             return
 
     raise ValueError(f"Workflow step not found: {step_name}")
+
+
+def infer_active_modules(
+    execution_trace: list[ExecutionTraceEntry],
+) -> list[str]:
+    """Infer active workflow modules from successfully executed tools."""
+    successful_tools = {
+        entry.tool_name for entry in execution_trace if entry.status == "success"
+    }
+    active_modules = ["shared"]
+    if successful_tools & {"calculate_risk_metrics", "run_stress_test"}:
+        active_modules.append("market_risk")
+    if "calculate_pfe_metrics" in successful_tools:
+        active_modules.append("credit_risk")
+    return active_modules
 
 
 def _registered_step(tool_name: str) -> WorkflowStep:
@@ -677,6 +694,7 @@ def _run_exposure_profile_workflow(
         query=query,
         plan=plan,
         execution_trace=execution_trace,
+        active_modules=infer_active_modules(execution_trace),
         parsed_portfolio=None,
         risk_report=None,
         pfe_result=pfe_result,

@@ -133,65 +133,68 @@ def validate_generated_report(
         )
 
     commentary_text = commentary or ""
-    consistency_errors = _commentary_metric_consistency_errors(
-        commentary_text,
-        risk_metrics,
-        percentage_tolerance,
-    )
-    checks.append(
-        ValidationCheck(
-            name="commentary_metric_consistency",
-            passed=not consistency_errors,
-            message=(
-                "Commentary percentage figures are consistent with calculated risk metrics."
-                if not consistency_errors
-                else "Commentary contains percentage figures inconsistent with calculated risk metrics."
-            ),
+    if risk_report is not None:
+        consistency_errors = _commentary_metric_consistency_errors(
+            commentary_text,
+            risk_metrics,
+            percentage_tolerance,
         )
-    )
-    errors.extend(consistency_errors)
+        checks.append(
+            ValidationCheck(
+                name="commentary_metric_consistency",
+                passed=not consistency_errors,
+                message=(
+                    "Commentary percentage figures are consistent with calculated risk metrics."
+                    if not consistency_errors
+                    else "Commentary contains percentage figures inconsistent with calculated risk metrics."
+                ),
+            )
+        )
+        errors.extend(consistency_errors)
 
-    pfe_errors = _pfe_result_consistency_errors(
-        commentary_text,
-        pfe_result,
-        value_tolerance=0.10,
-        time_tolerance=0.01,
-    )
-    checks.append(
-        ValidationCheck(
-            name="pfe_result_consistency",
-            passed=not pfe_errors,
-            message=(
-                "Commentary PFE figures are consistent with calculated exposure metrics."
-                if not pfe_errors
-                else "Commentary contains figures inconsistent with calculated PFE metrics."
-            ),
+    if pfe_result is not None:
+        pfe_errors = _pfe_result_consistency_errors(
+            commentary_text,
+            pfe_result,
+            value_tolerance=0.10,
+            time_tolerance=0.01,
         )
-    )
-    errors.extend(pfe_errors)
+        checks.append(
+            ValidationCheck(
+                name="pfe_result_consistency",
+                passed=not pfe_errors,
+                message=(
+                    "Commentary PFE figures are consistent with calculated exposure metrics."
+                    if not pfe_errors
+                    else "Commentary contains figures inconsistent with calculated PFE metrics."
+                ),
+            )
+        )
+        errors.extend(pfe_errors)
 
-    stress_errors, stress_warning = _stress_result_consistency_findings(
-        commentary_text,
-        stress_results or [],
-        percentage_tolerance,
-        value_tolerance=0.10,
-    )
-    stress_check_passed = not stress_errors and stress_warning is None
-    checks.append(
-        ValidationCheck(
-            name="stress_result_consistency",
-            passed=stress_check_passed,
-            message=(
-                "Commentary stress figures are consistent with calculated stress results."
-                if stress_check_passed
-                else stress_warning
-                or "Commentary contains figures inconsistent with calculated stress results."
-            ),
+    if stress_results:
+        stress_errors, stress_warning = _stress_result_consistency_findings(
+            commentary_text,
+            stress_results,
+            percentage_tolerance,
+            value_tolerance=0.10,
         )
-    )
-    errors.extend(stress_errors)
-    if stress_warning:
-        warnings.append(stress_warning)
+        stress_check_passed = not stress_errors and stress_warning is None
+        checks.append(
+            ValidationCheck(
+                name="stress_result_consistency",
+                passed=stress_check_passed,
+                message=(
+                    "Commentary stress figures are consistent with calculated stress results."
+                    if stress_check_passed
+                    else stress_warning
+                    or "Commentary contains figures inconsistent with calculated stress results."
+                ),
+            )
+        )
+        errors.extend(stress_errors)
+        if stress_warning:
+            warnings.append(stress_warning)
 
     _run_check(
         checks,
