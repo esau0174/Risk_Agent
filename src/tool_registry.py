@@ -8,6 +8,7 @@ from src.agent import (
     generate_risk_commentary,
     regenerate_risk_commentary_with_validation_errors,
 )
+from src.counterparty_risk import calculate_pfe_metrics
 from src.portfolio import validate_weights
 from src.portfolio_loader import load_portfolio_file
 from src.portfolio_parser import parse_portfolio_text
@@ -35,9 +36,15 @@ _REGISTERED_TOOLS: tuple[RiskTool, ...] = (
     ),
     RiskTool(
         name="load_portfolio_file",
-        description="Load and validate portfolio holdings from CSV, XLSX, or JSON.",
+        description="Load and validate market holdings or exposure profiles from CSV, XLSX, or JSON.",
         callable_name="src.portfolio_loader.load_portfolio_file",
         handler=load_portfolio_file,
+    ),
+    RiskTool(
+        name="calculate_pfe_metrics",
+        description="Calculate peak PFE and expected exposure profile metrics.",
+        callable_name="src.counterparty_risk.calculate_pfe_metrics",
+        handler=calculate_pfe_metrics,
     ),
     RiskTool(
         name="validate_portfolio",

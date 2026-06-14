@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Any
 
 from src.agent import _build_methodology_query
+from src.portfolio_loader import ExposureProfile
 from src.rag import load_methodology_docs
 from src.report_validator import ValidationResult
 from src.tool_executor import ToolExecutor
@@ -49,8 +50,9 @@ class WorkflowResult:
     query: str
     plan: WorkflowPlan
     execution_trace: list[ExecutionTraceEntry]
-    parsed_portfolio: dict
-    risk_report: dict
+    parsed_portfolio: dict | None
+    risk_report: dict | None
+    pfe_result: dict | None
     stress_test_results: list[dict]
     methodology_notes: list[dict]
     llm_commentary: str
@@ -159,14 +161,36 @@ def run_risk_workflow(
     executor = tool_executor or ToolExecutor()
 
     if portfolio_file is not None:
-        parsed_portfolio = _execute_traced(
+        loaded_portfolio = _execute_traced(
             executor,
             execution_trace,
             "load_portfolio_file",
             f"Structured portfolio file: {portfolio_file}.",
-            lambda output: f"Loaded {len(output['tickers'])} tickers from file.",
+            lambda output: (
+                f"Loaded {len(output.exposures)} exposure profile rows."
+                if isinstance(output, ExposureProfile)
+                else f"Loaded {len(output['tickers'])} tickers from file."
+            ),
             portfolio_file,
         )
+        if isinstance(loaded_portfolio, ExposureProfile):
+            plan = _build_exposure_profile_workflow_plan()
+            _complete_step(
+                plan,
+                "load_portfolio_file",
+                f"Loaded {len(loaded_portfolio.exposures)} exposure profile rows.",
+            )
+            return _run_exposure_profile_workflow(
+                query=query,
+                exposure_profile=loaded_portfolio,
+                config_file=config_file,
+                use_llm=use_llm,
+                executor=executor,
+                plan=plan,
+                execution_trace=execution_trace,
+                warnings=warnings,
+            )
+        parsed_portfolio = loaded_portfolio
         _complete_step(
             plan,
             "load_portfolio_file",
@@ -417,6 +441,7 @@ def run_risk_workflow(
         execution_trace=execution_trace,
         parsed_portfolio=parsed_portfolio,
         risk_report=risk_report,
+        pfe_result=None,
         stress_test_results=stress_test_results,
         methodology_notes=methodology_notes,
         llm_commentary=commentary,
@@ -471,6 +496,182 @@ def _build_file_portfolio_workflow_plan() -> WorkflowPlan:
             _registered_step("generate_commentary"),
             _registered_step("validate_report"),
         ],
+    )
+
+
+def _build_exposure_profile_workflow_plan() -> WorkflowPlan:
+    return WorkflowPlan(
+        objective="Analyze counterparty exposure profile and PFE metrics.",
+        steps=[
+            _registered_step("load_portfolio_file"),
+            _registered_step("load_risk_config"),
+            _registered_step("calculate_pfe_metrics"),
+            _registered_step("retrieve_methodology"),
+            _registered_step("generate_commentary"),
+            _registered_step("validate_report"),
+        ],
+    )
+
+
+def _run_exposure_profile_workflow(
+    query: str,
+    exposure_profile: ExposureProfile,
+    config_file: str | None,
+    use_llm: bool,
+    executor: ToolExecutor,
+    plan: WorkflowPlan,
+    execution_trace: list[ExecutionTraceEntry],
+    warnings: list[str],
+) -> WorkflowResult:
+    risk_config = _execute_traced(
+        executor,
+        execution_trace,
+        "load_risk_config",
+        (
+            f"Risk configuration file: {config_file}."
+            if config_file is not None
+            else "Default risk configuration."
+        ),
+        lambda output: "Loaded risk configuration for exposure analysis.",
+        config_file,
+    )
+    _complete_step(
+        plan,
+        "load_risk_config",
+        f"Loaded reporting configuration; VaR confidence is {risk_config.var.confidence_level:.0%}.",
+    )
+
+    pfe_result = _execute_traced(
+        executor,
+        execution_trace,
+        "calculate_pfe_metrics",
+        f"Exposure profile with {len(exposure_profile.exposures)} rows.",
+        lambda output: (
+            f"Calculated peak 95% PFE {output['peak_pfe_95']:.2f} and EPE "
+            f"{output['epe']:.2f}."
+        ),
+        exposure_profile,
+    )
+    _complete_step(
+        plan,
+        "calculate_pfe_metrics",
+        (
+            f"Calculated peak 95% PFE, EPE, and netting-set exposure metrics; "
+            f"largest set is {pfe_result['largest_netting_set_by_peak_pfe']}."
+        ),
+    )
+
+    docs = load_methodology_docs()
+    methodology_query = (
+        f"{query} counterparty exposure profile potential future exposure PFE "
+        "expected positive exposure EPE netting set model limitations"
+    )
+    methodology_notes = _execute_traced(
+        executor,
+        execution_trace,
+        "retrieve_methodology",
+        f"Counterparty methodology query across {len(docs)} local documents.",
+        lambda output: f"Retrieved {len(output)} methodology notes.",
+        methodology_query,
+        docs,
+        top_k=4,
+    )
+    _complete_step(
+        plan,
+        "retrieve_methodology",
+        f"Retrieved methodology notes: {[doc['title'] for doc in methodology_notes]}.",
+    )
+
+    commentary = _execute_traced(
+        executor,
+        execution_trace,
+        "generate_commentary",
+        f"PFE result and {len(methodology_notes)} methodology notes; LLM enabled: {use_llm}.",
+        lambda output: f"Generated commentary with {len(output)} characters.",
+        query,
+        None,
+        methodology_notes,
+        use_llm=use_llm,
+        pfe_result=pfe_result,
+    )
+    if use_llm:
+        commentary_summary = "Generated LLM commentary from calculated PFE metrics."
+    else:
+        warnings.append("LLM commentary disabled; returned deterministic fallback commentary.")
+        commentary_summary = "Generated deterministic PFE commentary without calling the LLM."
+    _complete_step(plan, "generate_commentary", commentary_summary)
+
+    validation_result = _execute_traced(
+        executor,
+        execution_trace,
+        "validate_report",
+        "PFE metrics, methodology notes, and counterparty commentary.",
+        lambda output: (
+            f"Validation {'passed' if output.passed else 'failed'} with "
+            f"{len(output.errors)} errors and {len(output.warnings)} warnings."
+        ),
+        None,
+        None,
+        methodology_notes,
+        commentary,
+        pfe_result=pfe_result,
+    )
+
+    if not validation_result.passed:
+        commentary = _execute_traced(
+            executor,
+            execution_trace,
+            "regenerate_commentary_with_validation_errors",
+            f"PFE commentary with {len(validation_result.errors)} validation errors.",
+            lambda output: f"Regenerated commentary with {len(output)} characters.",
+            None,
+            commentary,
+            list(validation_result.errors),
+            list(validation_result.warnings),
+            methodology_notes,
+            use_llm=use_llm,
+            pfe_result=pfe_result,
+        )
+        warnings.append("Initial commentary failed validation; commentary was regenerated once.")
+        validation_result = _execute_traced(
+            executor,
+            execution_trace,
+            "validate_report",
+            "Regenerated PFE commentary and original analytical inputs.",
+            lambda output: (
+                f"Validation {'passed' if output.passed else 'failed'} with "
+                f"{len(output.errors)} errors and {len(output.warnings)} warnings."
+            ),
+            None,
+            None,
+            methodology_notes,
+            commentary,
+            pfe_result=pfe_result,
+        )
+
+    warnings.extend(validation_result.warnings)
+    _complete_step(
+        plan,
+        "validate_report",
+        (
+            f"Report validation {'passed' if validation_result.passed else 'failed'}; "
+            f"{len(validation_result.errors)} errors and "
+            f"{len(validation_result.warnings)} warnings."
+        ),
+    )
+
+    return WorkflowResult(
+        query=query,
+        plan=plan,
+        execution_trace=execution_trace,
+        parsed_portfolio=None,
+        risk_report=None,
+        pfe_result=pfe_result,
+        stress_test_results=[],
+        methodology_notes=methodology_notes,
+        llm_commentary=commentary,
+        validation_result=validation_result,
+        warnings=warnings,
     )
 
 

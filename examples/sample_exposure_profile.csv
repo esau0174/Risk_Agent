@@ -1,0 +1,6 @@
+netting_set,time_years,expected_exposure,pfe_95,pfe_99,currency,counterparty
+NS-001,0.0,1250000,1800000,2200000,USD,Counterparty A
+NS-001,1.0,1400000,2100000,2600000,USD,Counterparty A
+NS-001,2.0,1100000,1900000,2400000,USD,Counterparty A
+NS-002,0.0,750000,1200000,1500000,USD,Counterparty B
+NS-002,1.0,900000,1450000,1800000,USD,Counterparty B

@@ -72,62 +72,65 @@ def validate_generated_report(
     commentary: str,
     percentage_tolerance: float = 0.10,
     stress_results=None,
+    pfe_result=None,
 ) -> ValidationResult:
     """Validate calculated risk outputs and generated commentary guardrails."""
     checks: list[ValidationCheck] = []
     errors: list[str] = []
     warnings: list[str] = []
 
-    _run_check(
-        checks,
-        errors,
-        "portfolio_weights_sum_to_one",
-        _weights_sum_to_one(parsed_portfolio),
-        "Portfolio weights sum to 1 within tolerance.",
-        "Portfolio weights must sum to 1 within tolerance.",
-    )
+    if pfe_result is None:
+        _run_check(
+            checks,
+            errors,
+            "portfolio_weights_sum_to_one",
+            _weights_sum_to_one(parsed_portfolio),
+            "Portfolio weights sum to 1 within tolerance.",
+            "Portfolio weights must sum to 1 within tolerance.",
+        )
 
-    risk_metrics = _get(risk_report, "risk_metrics", {})
+    risk_metrics = _get(risk_report, "risk_metrics", {}) if risk_report else {}
     historical_var = _get(risk_metrics, "historical_var")
     expected_shortfall = _get(risk_metrics, "expected_shortfall")
     max_drawdown = _get(risk_metrics, "max_drawdown")
 
-    _run_check(
-        checks,
-        errors,
-        "historical_var_positive_loss",
-        _is_positive_number(historical_var),
-        "Historical VaR is a positive loss magnitude.",
-        "Historical VaR must be a positive loss magnitude.",
-    )
-    _run_check(
-        checks,
-        errors,
-        "expected_shortfall_positive_loss",
-        _is_positive_number(expected_shortfall),
-        "Expected Shortfall is a positive loss magnitude.",
-        "Expected Shortfall must be a positive loss magnitude.",
-    )
-    _run_check(
-        checks,
-        errors,
-        "expected_shortfall_at_least_var",
-        (
-            _is_number(expected_shortfall)
-            and _is_number(historical_var)
-            and expected_shortfall >= historical_var
-        ),
-        "Expected Shortfall is greater than or equal to historical VaR.",
-        "Expected Shortfall must be greater than or equal to historical VaR.",
-    )
-    _run_check(
-        checks,
-        errors,
-        "max_drawdown_positive_loss",
-        _is_positive_number(max_drawdown),
-        "Maximum drawdown is a positive loss magnitude.",
-        "Maximum drawdown must be a positive loss magnitude.",
-    )
+    if pfe_result is None:
+        _run_check(
+            checks,
+            errors,
+            "historical_var_positive_loss",
+            _is_positive_number(historical_var),
+            "Historical VaR is a positive loss magnitude.",
+            "Historical VaR must be a positive loss magnitude.",
+        )
+        _run_check(
+            checks,
+            errors,
+            "expected_shortfall_positive_loss",
+            _is_positive_number(expected_shortfall),
+            "Expected Shortfall is a positive loss magnitude.",
+            "Expected Shortfall must be a positive loss magnitude.",
+        )
+        _run_check(
+            checks,
+            errors,
+            "expected_shortfall_at_least_var",
+            (
+                _is_number(expected_shortfall)
+                and _is_number(historical_var)
+                and expected_shortfall >= historical_var
+            ),
+            "Expected Shortfall is greater than or equal to historical VaR.",
+            "Expected Shortfall must be greater than or equal to historical VaR.",
+        )
+        _run_check(
+            checks,
+            errors,
+            "max_drawdown_positive_loss",
+            _is_positive_number(max_drawdown),
+            "Maximum drawdown is a positive loss magnitude.",
+            "Maximum drawdown must be a positive loss magnitude.",
+        )
 
     commentary_text = commentary or ""
     consistency_errors = _commentary_metric_consistency_errors(
@@ -147,6 +150,25 @@ def validate_generated_report(
         )
     )
     errors.extend(consistency_errors)
+
+    pfe_errors = _pfe_result_consistency_errors(
+        commentary_text,
+        pfe_result,
+        value_tolerance=0.10,
+        time_tolerance=0.01,
+    )
+    checks.append(
+        ValidationCheck(
+            name="pfe_result_consistency",
+            passed=not pfe_errors,
+            message=(
+                "Commentary PFE figures are consistent with calculated exposure metrics."
+                if not pfe_errors
+                else "Commentary contains figures inconsistent with calculated PFE metrics."
+            ),
+        )
+    )
+    errors.extend(pfe_errors)
 
     stress_errors, stress_warning = _stress_result_consistency_findings(
         commentary_text,
@@ -391,6 +413,79 @@ def _stress_result_consistency_findings(
                     )
 
     return errors, None
+
+
+def _pfe_result_consistency_errors(
+    commentary: str,
+    pfe_result,
+    value_tolerance: float,
+    time_tolerance: float,
+) -> list[str]:
+    if value_tolerance < 0 or time_tolerance < 0:
+        raise ValueError("PFE result tolerances must be non-negative.")
+    if not pfe_result:
+        return []
+
+    segments = [
+        segment.strip()
+        for segment in re.split(r"(?:[.!?;](?=\s|$)|\r?\n)", commentary)
+        if segment.strip()
+        and re.search(
+            r"\b(?:pfe|epe|expected\s+exposure|counterparty\s+exposure)\b",
+            segment,
+            re.I,
+        )
+    ]
+    pfe_text = " ".join(segments)
+    if not pfe_text:
+        return ["PFE results are available, but commentary omits PFE analysis."]
+
+    errors = []
+    peak_match = re.search(
+        r"peak\s+(?:95%\s+)?pfe[^.!?;\n\d]{0,30}"
+        r"(?P<value>\d[\d,]*(?:\.\d+)?)"
+        r"[^.!?;\n]{0,30}?\b(?:at|time(?:\s+of\s+peak)?(?:\s+is)?)\s+"
+        r"(?P<time>\d+(?:\.\d+)?)\s*(?:years?|yrs?)",
+        pfe_text,
+        re.I,
+    )
+    if peak_match:
+        found_peak = _number_from_match(peak_match, "value")
+        expected_peak = float(_get(pfe_result, "peak_pfe_95"))
+        if abs(found_peak - expected_peak) > value_tolerance:
+            errors.append(
+                f"Peak PFE 95 mismatch: expected {expected_peak:.2f}, "
+                f"found {found_peak:.2f}."
+            )
+
+        found_time = _number_from_match(peak_match, "time")
+        expected_time = float(_get(pfe_result, "time_of_peak_pfe_95"))
+        if abs(found_time - expected_time) > time_tolerance:
+            errors.append(
+                f"Time of peak PFE 95 mismatch: expected {expected_time:.2f} years, "
+                f"found {found_time:.2f} years."
+            )
+
+    epe_match = re.search(
+        r"(?:average\s+expected\s+exposure\s*\(\s*epe\s*\)|"
+        r"average\s+expected\s+exposure|\bepe\b)"
+        r"[^.!?;\n\d]{0,30}(?P<value>\d[\d,]*(?:\.\d+)?)",
+        pfe_text,
+        re.I,
+    )
+    if epe_match:
+        found_epe = _number_from_match(epe_match, "value")
+        expected_epe = float(_get(pfe_result, "epe"))
+        if abs(found_epe - expected_epe) > value_tolerance:
+            errors.append(
+                f"EPE mismatch: expected {expected_epe:.2f}, found {found_epe:.2f}."
+            )
+
+    return errors
+
+
+def _number_from_match(match: re.Match, group: str) -> float:
+    return float(match.group(group).replace(",", ""))
 
 
 def _stress_relevant_segments(commentary: str, stress_results) -> list[str]:
