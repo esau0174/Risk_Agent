@@ -13,6 +13,14 @@ from src.tool_executor import ToolExecutor
 from src.tool_registry import get_tool
 
 
+PFE_METHODOLOGY_TITLES = {
+    "Potential Future Exposure",
+    "Expected Exposure and EPE",
+    "Netting Set Exposure",
+    "Counterparty Exposure Limitations",
+}
+
+
 @dataclass
 class WorkflowStep:
     name: str
@@ -561,10 +569,15 @@ def _run_exposure_profile_workflow(
         ),
     )
 
-    docs = load_methodology_docs()
+    docs = [
+        doc
+        for doc in load_methodology_docs()
+        if doc["title"] in PFE_METHODOLOGY_TITLES
+    ]
     methodology_query = (
-        f"{query} counterparty exposure profile potential future exposure PFE "
-        "expected positive exposure EPE netting set model limitations"
+        f"{query} potential future exposure PFE exposure profile expected exposure "
+        "expected positive exposure EPE netting set netting agreement counterparty "
+        "exposure limitations Monte Carlo pricing engine"
     )
     methodology_notes = _execute_traced(
         executor,

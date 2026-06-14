@@ -95,6 +95,24 @@ def _phrase_score(query: str, title: str, content: str) -> int:
     phrases = {
         "var": ("var", "value at risk", "historical var"),
         "expected shortfall": ("expected shortfall", "tail loss"),
+        "potential future exposure": (
+            "potential future exposure",
+            "pfe",
+            "exposure profile",
+        ),
+        "pfe": ("potential future exposure", "pfe", "exposure profile"),
+        "expected exposure": (
+            "expected exposure",
+            "expected positive exposure",
+            "epe",
+        ),
+        "epe": ("expected exposure", "expected positive exposure", "epe"),
+        "netting set": ("netting set", "netting agreement", "netted exposure"),
+        "counterparty exposure": (
+            "counterparty exposure",
+            "counterparty risk",
+            "monte carlo pricing engine",
+        ),
         "drawdown": ("drawdown", "maximum drawdown"),
         "concentration": ("concentration", "sector", "factor", "technology", "growth"),
         "limitations": ("limitation", "limitations", "not investment advice"),

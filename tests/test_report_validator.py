@@ -226,6 +226,22 @@ def test_unsupported_methodology_citation_fails():
     assert any("were not retrieved: Stress Testing" in error for error in result.errors)
 
 
+def test_methodology_title_containing_and_is_not_split():
+    commentary = (
+        "Assumptions and limitations: supplied exposure profile only. "
+        "Methodology reference: Expected Exposure and EPE."
+    )
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        [{"title": "Expected Exposure and EPE"}],
+        commentary,
+    )
+
+    assert result.passed is True
+
+
 def test_negated_guarantee_disclaimer_does_not_fail_certainty_check():
     commentary = (
         "Assumptions and limitations: historical data only, without guaranteed "
