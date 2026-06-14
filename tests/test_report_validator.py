@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from src.report_validator import validate_generated_report
+from src.report_validator import (
+    ReportValidationResult,
+    ValidationResult,
+    validate_generated_report,
+)
 
 
 def _valid_parsed_portfolio() -> dict:
@@ -63,6 +67,10 @@ def _pfe_result() -> dict:
         "largest_netting_set_by_peak_pfe": "NS-001",
         "largest_netting_set_peak_pfe_95": 2_100_000.0,
     }
+
+
+def test_report_validation_result_remains_public_through_facade():
+    assert ReportValidationResult is ValidationResult
 
 
 def test_valid_numerical_report_and_safe_commentary_pass():
