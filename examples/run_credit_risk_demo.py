@@ -28,7 +28,7 @@ def main() -> None:
         use_llm=False,
     )
 
-    print("FinRisk Agent - Credit Risk Workflow Demo")
+    print("RiskFlow Agent - Credit Risk Workflow Demo")
     print("==========================================")
     print("Counterparty Exposure / PFE Analysis")
     print()
@@ -40,7 +40,7 @@ def main() -> None:
     print_registered_tools_by_module(list_registered_tools())
     print_workflow_plan(result.plan)
     print_execution_trace(result.execution_trace)
-    print("Credit Risk Results / PFE Metrics")
+    print("Credit Risk Results")
     for name, value in result.pfe_result.items():
         print(f"- {name}: {value}")
     print()

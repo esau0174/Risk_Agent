@@ -1,6 +1,6 @@
-# FinRisk Agent
+# RiskFlow Agent
 
-FinRisk Agent is an agentic financial risk workflow demo built around deterministic Python analytics. It combines explicit workflow planning, registered tool execution, runtime tracing, local methodology retrieval, LLM or deterministic commentary, and a validation gate.
+RiskFlow Agent is an agentic financial risk workflow demo built around deterministic Python analytics. It combines explicit workflow planning, registered tool execution, runtime tracing, local methodology retrieval, LLM or deterministic commentary, and a validation gate.
 
 The project supports market-risk and counterparty-exposure workflows through one orchestration engine. Risk calculations remain authoritative; generated commentary explains supplied results and is checked against them before the workflow returns.
 
@@ -8,7 +8,7 @@ This is an engineering and analytics demonstration, not a production risk platfo
 
 ## Why It Is Agentic
 
-FinRisk Agent does more than call an LLM from a script. The workflow makes planning and execution explicit:
+RiskFlow Agent does more than call an LLM from a script. The workflow makes planning and execution explicit:
 
 - A deterministic planner builds the expected sequence of steps.
 - A tool registry exposes named shared, market-risk, and credit-risk capabilities.
@@ -36,7 +36,7 @@ The market-risk path accepts ticker weights, loads historical market data, calcu
 
 VaR, ES, and drawdown are reported as positive loss magnitudes.
 
-### Credit Risk / PFE
+### Credit Risk
 
 The credit-risk path accepts a supplied counterparty exposure profile and calculates:
 
@@ -82,7 +82,7 @@ query + data_file + config_file
        +------+------+
        |             |
        v             v
- market risk     credit risk / PFE
+ market risk       credit risk
  analytics       exposure analytics
        |             |
        +------+------+
@@ -209,7 +209,7 @@ Representative market-risk results:
 - Stress scenario loss: 22.50%
 - Validation: PASSED
 
-Representative credit-risk / PFE results:
+Representative Credit Risk results:
 
 - Peak 95% PFE: USD 2,100,000
 - Peak 99% PFE: USD 2,600,000
@@ -240,4 +240,4 @@ Representative credit-risk / PFE results:
 
 ## Disclaimer
 
-FinRisk Agent is for analytical demonstration only and does not constitute investment advice.
+RiskFlow Agent is for analytical demonstration only and does not constitute investment advice.

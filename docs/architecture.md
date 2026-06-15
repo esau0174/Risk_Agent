@@ -1,14 +1,14 @@
-# FinRisk Agent Architecture
+# RiskFlow Agent Architecture
 
 ## Project Goal
 
-FinRisk Agent is a risk analytics application that combines deterministic Python calculations with controlled LLM commentary. It accepts an analysis instruction, structured or natural-language portfolio input, and optional calculation configuration. The system produces market-risk or counterparty-exposure results, retrieves local methodology notes, generates commentary, and validates the resulting report.
+RiskFlow Agent is a risk analytics application that combines deterministic Python calculations with controlled LLM commentary. It accepts an analysis instruction, structured or natural-language portfolio input, and optional calculation configuration. The system produces market-risk or counterparty-exposure results, retrieves local methodology notes, generates commentary, and validates the resulting report.
 
 The calculations remain authoritative. The LLM explains calculated results; it does not calculate or replace them.
 
 ## High-Level Design
 
-FinRisk Agent separates deterministic workflow orchestration from domain analytics. Shared tools route structured inputs into market-risk or credit-risk modules, local methodology retrieval grounds commentary, and deterministic validators enforce numerical and policy guardrails. A presentation layer produces a clean user report while retaining raw analytics, validation results, and an auditable execution trace.
+RiskFlow Agent separates deterministic workflow orchestration from domain analytics. Shared tools route structured inputs into market-risk or credit-risk modules, local methodology retrieval grounds commentary, and deterministic validators enforce numerical and policy guardrails. A presentation layer produces a clean user report while retaining raw analytics, validation results, and an auditable execution trace.
 
 ## Why This Is an Agentic Workflow
 
@@ -58,7 +58,7 @@ load or parse portfolio
   -> validate report
 ```
 
-Counterparty/PFE execution is:
+Credit Risk execution is:
 
 ```text
 load exposure profile
@@ -121,7 +121,7 @@ The registry includes input adapters, market and credit calculations, methodolog
 
 Market prices are downloaded by `src/data/market_data.py`; portfolio return calculations and weight validation live in `src/data/portfolio.py`.
 
-## Credit Risk / PFE Module
+## Credit Risk Module
 
 `src/credit_risk/counterparty_risk.py` calculates summary analytics from a supplied exposure profile:
 

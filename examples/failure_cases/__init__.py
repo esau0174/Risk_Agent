@@ -1,1 +1,1 @@
-"""Presentation demos for expected FinRisk Agent failure paths."""
+"""Presentation demos for expected RiskFlow Agent failure paths."""

@@ -50,7 +50,7 @@ def save_execution_trace(result: AgentRunResult, trace_file: str | Path) -> Path
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the combined FinRisk Agent demo.")
+    parser = argparse.ArgumentParser(description="Run the combined RiskFlow Agent demo.")
     parser.add_argument(
         "--trace-file",
         nargs="?",

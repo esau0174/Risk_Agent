@@ -1,6 +1,6 @@
 # Legacy Demos
 
-These scripts are earlier FinRisk Agent demonstrations retained for reference:
+These scripts are earlier RiskFlow Agent demonstrations retained for reference:
 
 - `run_phase1_demo.py`: direct Phase 1 market-risk analytics.
 - `run_text_query_demo.py`: rule-based natural-language portfolio parsing and market-risk reporting.

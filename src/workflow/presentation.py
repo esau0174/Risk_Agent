@@ -51,7 +51,7 @@ def _build_user_report(
     )
 
     lines = [
-        "FinRisk Agent - Full Risk Workflow Demo",
+        "RiskFlow Agent - Full Risk Workflow Demo",
         "=======================================",
         "Combined Executive Summary",
         "Active modules covered: Market Risk, Credit Risk",
@@ -69,7 +69,7 @@ def _build_user_report(
         [
             f"- Validation: {_validation_status(market_result)}",
             "",
-            "Credit Risk / PFE",
+            "Credit Risk",
             f"- Peak 95% PFE: USD {pfe_metrics['peak_pfe_95']:,.2f}",
         ]
     )

@@ -39,7 +39,7 @@ def main() -> None:
         config_file=config_file,
     )
 
-    print("FinRisk Agent - Agentic Risk Workflow Demo")
+    print("RiskFlow Agent - Agentic Risk Workflow Demo")
     print("==========================================")
     print_input_summary(query, data_file, config_file, result.active_modules)
     print_registered_tools_by_module(list_registered_tools())

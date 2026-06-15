@@ -34,8 +34,8 @@ def main() -> None:
         commentary=commentary,
     )
 
-    print("Report Validation Failure Demo")
-    print("==============================")
+    print("RiskFlow Agent - Report Validation Failure Demo")
+    print("===============================================")
     print("Intentional inconsistency: reported VaR is 9.00%; calculated VaR is 2.00%.\n")
     print_validation_result(validation_result)
 

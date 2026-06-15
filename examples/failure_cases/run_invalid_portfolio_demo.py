@@ -21,8 +21,8 @@ DEFAULT_TRACE_FILE = "logs/invalid_portfolio_trace.json"
 def main(argv: list[str] | None = None) -> None:
     args = _parse_args(argv)
 
-    print("Invalid Portfolio Validation Demo")
-    print("=================================")
+    print("RiskFlow Agent - Invalid Portfolio Validation Demo")
+    print("==================================================")
     try:
         run_risk_workflow(
             query=QUERY,
