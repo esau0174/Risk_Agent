@@ -143,10 +143,10 @@ If commentary fails validation, the workflow permits one regeneration attempt an
 Requires Python 3.10+.
 
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
 
-Optional editable installation for local development:
+For local development and tests, install the `dev` extra:
 
 ```bash
 pip install -e ".[dev]"

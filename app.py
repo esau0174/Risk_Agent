@@ -13,9 +13,9 @@ DEFAULT_QUERY = (
 
 
 def main() -> None:
-    st.set_page_config(page_title="FinRisk Agent", page_icon="📊", layout="wide")
+    st.set_page_config(page_title="RiskFlow Agent", page_icon="📊", layout="wide")
 
-    st.title("FinRisk Agent")
+    st.title("RiskFlow Agent")
     st.subheader("LLM-Powered Portfolio Risk Analyst")
 
     query = st.text_area(

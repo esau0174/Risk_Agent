@@ -1,8 +1,8 @@
-# FinRisk Agent Project Spec
+# RiskFlow Agent Project Spec
 
 ## Project Name
 
-FinRisk Agent
+RiskFlow Agent
 
 ## Project Goal
 
