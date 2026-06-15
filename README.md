@@ -93,7 +93,9 @@ query + data_file + config_file
               v
  validation and guardrail checks
               v
- WorkflowResult + execution trace
+ structured AgentRunResult
+  |       |       |       |
+ report  trace  validation raw outputs
 ```
 
 Canonical source packages:
@@ -108,6 +110,17 @@ Canonical source packages:
 - `src/reporting/`: commentary generation and report formatting utilities.
 
 Canonical imports use the package paths above. See [docs/architecture.md](docs/architecture.md) for implementation details.
+
+## Structured Agent Output
+
+The combined workflow returns an `AgentRunResult` that separates presentation from internal execution details:
+
+- `user_report`: clean user-facing market-risk and credit-risk summary.
+- `execution_trace`: auditable workflow and tool execution records.
+- `validation_result`: structured guardrail checks, errors, and warnings.
+- `raw_outputs`: underlying market-risk and credit-risk analytics outputs.
+
+The main demo prints only `user_report` by default. Internal trace data can be serialized separately for inspection without cluttering the user-facing report.
 
 ## Validation And Guardrails
 
@@ -141,7 +154,7 @@ OPENAI_API_KEY=your_api_key_here
 
 Do not commit `.env` or API keys. The credit-risk demo uses deterministic commentary and does not require an API key.
 
-## Run
+## Quick Start
 
 Run the complete test suite:
 
@@ -149,23 +162,45 @@ Run the complete test suite:
 pytest -q
 ```
 
-Run the market-risk workflow demo:
+Run the recommended combined market-risk and credit-risk demo:
 
 ```bash
-python examples/run_llm_agent_demo.py
+python examples/run_full_risk_agent_demo.py
 ```
 
-Run the deterministic counterparty exposure / PFE demo:
+Optionally save its execution trace as JSON:
 
 ```bash
-python examples/run_credit_risk_demo.py
+python examples/run_full_risk_agent_demo.py --trace-file
 ```
 
-The demos display registered tools, the planned workflow, the runtime execution trace, analytical results, retrieved methodology, commentary, and validation status.
+Focused market-risk and counterparty/PFE demos remain available in `examples/run_llm_agent_demo.py` and `examples/run_credit_risk_demo.py`.
+
+## Failure-Case Demos
+
+Demonstrate portfolio validation stopping execution before risk calculation:
+
+```bash
+python examples/failure_cases/run_invalid_portfolio_demo.py
+```
+
+Optionally save the partial failed trace:
+
+```bash
+python examples/failure_cases/run_invalid_portfolio_demo.py --trace-file
+```
+
+Demonstrate report/commentary validation with an intentionally inconsistent VaR value:
+
+```bash
+python examples/failure_cases/run_report_validation_failure_demo.py
+```
 
 ## Example Output Snapshot
 
-Representative market-risk demo output:
+The full demo begins with a `Combined Executive Summary` covering the active modules: **Market Risk** and **Credit Risk**.
+
+Representative market-risk results:
 
 - Annualized volatility: 26.71%
 - 95% historical VaR: 2.32%
@@ -174,11 +209,11 @@ Representative market-risk demo output:
 - Stress scenario loss: 22.50%
 - Validation: PASSED
 
-Representative credit-risk / PFE demo output:
+Representative credit-risk / PFE results:
 
-- Peak 95% PFE: 2,100,000
-- Peak 99% PFE: 2,600,000
-- EPE: 1,080,000
+- Peak 95% PFE: USD 2,100,000
+- Peak 99% PFE: USD 2,600,000
+- EPE: USD 1,080,000
 - Largest netting set: NS-001
 - Validation: PASSED
 
@@ -200,6 +235,7 @@ Representative credit-risk / PFE demo output:
 - Improve retrieval with embeddings, vector search, and stronger ranking.
 - Add formal factor exposure and richer scenario or full-revaluation stress models.
 - Generate exposure profiles from pricing simulations and extend toward XVA analytics.
+- Add SA-CCR exposure and capital calculations; SA-CCR is not currently implemented.
 - Add durable execution state, richer observability, and PDF/HTML report export.
 
 ## Disclaimer

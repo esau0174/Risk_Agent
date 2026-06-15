@@ -6,6 +6,10 @@ FinRisk Agent is a risk analytics application that combines deterministic Python
 
 The calculations remain authoritative. The LLM explains calculated results; it does not calculate or replace them.
 
+## High-Level Design
+
+FinRisk Agent separates deterministic workflow orchestration from domain analytics. Shared tools route structured inputs into market-risk or credit-risk modules, local methodology retrieval grounds commentary, and deterministic validators enforce numerical and policy guardrails. A presentation layer produces a clean user report while retaining raw analytics, validation results, and an auditable execution trace.
+
 ## Why This Is an Agentic Workflow
 
 The application is not a single prompt or linear script. `src/workflow/` provides an explicit planning and execution layer:
@@ -13,7 +17,8 @@ The application is not a single prompt or linear script. `src/workflow/` provide
 - `planner.py` builds deterministic workflow plans, detects the loaded-data route, and infers active modules.
 - `engine.py` orchestrates the selected route and owns the high-level execution sequence.
 - `execution.py` invokes tools through `ToolExecutor` and records concise runtime trace entries.
-- `types.py` defines plans, steps, results, and execution trace records.
+- `types.py` defines plans, steps, route results, presentation results, and execution trace records.
+- `presentation.py` combines route results into a clean user report while preserving trace, validation, and raw outputs.
 
 Each capability is registered as a named tool. Planned steps and actual tool calls are separately inspectable through `WorkflowPlan` and `execution_trace`. Commentary is validated after generation, with one controlled regeneration attempt when validation fails.
 
@@ -66,6 +71,15 @@ load exposure profile
 
 The market route skips PFE analytics. The credit route skips portfolio-weight validation, historical market-risk calculations, and market stress testing. Both routes return `WorkflowResult` and use the same orchestration engine, execution tracing, commentary generation, and validation gate.
 
+The combined presentation workflow runs both routes and returns `AgentRunResult`:
+
+- `user_report`: presentation-ready final risk summary.
+- `execution_trace`: serialized, auditable tool and workflow steps.
+- `validation_result`: combined market and credit validation outcomes.
+- `raw_outputs`: complete underlying route results for further inspection.
+
+This keeps internal workflow evidence available without printing it alongside the user-facing report.
+
 ## Shared Tool Infrastructure
 
 The canonical implementation is organized into eight packages:
@@ -77,7 +91,7 @@ The canonical implementation is organized into eight packages:
 - `src/market_risk/`: historical market-risk metrics, report assembly, and deterministic stress testing.
 - `src/credit_risk/`: counterparty exposure and PFE summary analytics.
 - `src/knowledge/`: local methodology loading and keyword-based retrieval.
-- `src/reporting/`: LLM and fallback commentary generation plus the report-generation placeholder.
+- `src/reporting/`: LLM and fallback commentary generation plus report formatting utilities.
 
 Within `src/core/`:
 
@@ -90,10 +104,10 @@ Supporting shared capabilities are separated by responsibility:
 - `src/data/portfolio_loader.py` loads and validates supported structured data schemas.
 - `src/data/portfolio_parser.py` parses natural-language market portfolios.
 - `src/data/portfolio.py` validates weights and calculates asset, portfolio, and cumulative returns.
-- `src/data/market_data.py` downloads adjusted close market data.
+- `src/data/market_data.py` loads historical market data.
 - `src/knowledge/rag.py` loads and ranks local methodology documents.
 - `src/reporting/agent.py` builds prompts and produces LLM or deterministic fallback commentary.
-- `src/reporting/report_generator.py` is currently an empty placeholder.
+- `src/reporting/report_generator.py` contains report formatting utilities.
 
 The registry includes input adapters, market and credit calculations, methodology retrieval, commentary generation/regeneration, and report validation. It is an in-process Python registry, not a remote tool protocol or OpenAI tool-calling implementation.
 
@@ -145,6 +159,17 @@ The prompt instructs the model to use only supplied calculations, avoid invented
 
 Validation preserves deterministic check ordering and returns structured checks, errors, and warnings. Optional analytics are validated only when corresponding results exist. A failed first validation triggers at most one commentary regeneration and one second validation; there is no unbounded retry loop.
 
+## Presentation And Trace Serialization
+
+`src/workflow/presentation.py` converts the market and credit `WorkflowResult` objects into an `AgentRunResult`. The full demo prints only `user_report` by default. Passing `--trace-file` to `examples/run_full_risk_agent_demo.py` writes the internal `execution_trace` to `logs/full_demo_trace.json`, or to a supplied path.
+
+Failure behavior is demonstrated separately under `examples/failure_cases/`:
+
+- `run_invalid_portfolio_demo.py` shows portfolio validation preventing risk calculation and can save the partial failed trace with `--trace-file`.
+- `run_report_validation_failure_demo.py` passes intentionally inconsistent commentary to the report validator and displays its errors and warnings.
+
+These presentation scripts call existing workflow and validation APIs; they do not duplicate analytics or orchestration logic.
+
 ## Current Limitations
 
 - Workflow planning and routing are deterministic, not LLM-directed.
@@ -163,5 +188,6 @@ Possible cleanup and extensions, not part of the current architecture, include:
 
 - Strengthen methodology retrieval with embeddings, vector search, or improved ranking while retaining source grounding.
 - Expand risk analytics with formal factor exposure, richer stress and revaluation models, pricing-engine-derived exposure profiles, and XVA extensions.
+- Add SA-CCR exposure and capital calculations; SA-CCR is not part of the current implementation.
 
 These items describe direction only. The implemented system remains the deterministic, in-process workflow documented above.
