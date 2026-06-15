@@ -7,6 +7,7 @@ EXPECTED_TOOL_NAMES = [
     "parse_portfolio",
     "load_portfolio_file",
     "calculate_pfe_metrics",
+    "assess_regulatory_readiness",
     "validate_portfolio",
     "load_risk_config",
     "calculate_risk_metrics",
@@ -21,6 +22,7 @@ EXPECTED_TOOL_MODULES = {
     "parse_portfolio": "shared",
     "load_portfolio_file": "shared",
     "calculate_pfe_metrics": "credit_risk",
+    "assess_regulatory_readiness": "regulatory_risk",
     "validate_portfolio": "market_risk",
     "load_risk_config": "shared",
     "calculate_risk_metrics": "market_risk",
@@ -65,6 +67,9 @@ def test_list_tools_by_module_returns_category_tools():
     ]
     assert [tool.name for tool in list_tools_by_module("credit_risk")] == [
         "calculate_pfe_metrics"
+    ]
+    assert [tool.name for tool in list_tools_by_module("regulatory_risk")] == [
+        "assess_regulatory_readiness"
     ]
 
 

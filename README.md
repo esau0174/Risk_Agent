@@ -2,7 +2,7 @@
 
 RiskFlow Agent is an agentic financial risk workflow demo built around deterministic Python analytics. It combines explicit workflow planning, registered tool execution, runtime tracing, local methodology retrieval, LLM or deterministic commentary, and a validation gate.
 
-The project supports market-risk and counterparty-exposure workflows through one orchestration engine. Risk calculations remain authoritative; generated commentary explains supplied results and is checked against them before the workflow returns.
+The project supports market-risk, counterparty-exposure, and regulatory-readiness workflows through one orchestration and presentation layer. Risk calculations remain authoritative; generated commentary explains supplied results and is checked against them before the workflow returns.
 
 This is an engineering and analytics demonstration, not a production risk platform or investment advisory system.
 
@@ -52,6 +52,10 @@ The credit-risk path accepts a supplied counterparty exposure profile and calcul
 This path summarizes supplied exposure profiles. It does not generate exposures through a pricing or Monte Carlo engine.
 When `credit_limits` are supplied by netting set, utilization is calculated as Peak 95% PFE divided by the configured limit. Limit status values are `PASSED`, `WARNING`, or `BREACHED`.
 
+### Regulatory Risk
+
+The regulatory-risk path is a readiness screen, not a capital calculator. It checks whether available inputs are sufficient for downstream SA-CCR and SIMM / RegIM workflows, reports missing fields, and explicitly avoids generating regulatory capital or margin numbers when inputs are insufficient.
+
 ## Input Model
 
 The shared entry point is `run_risk_workflow()` from `src.workflow`:
@@ -81,13 +85,14 @@ query + data_file + config_file
               v
      registered tool execution
               |
-       +------+------+
-       |             |
-       v             v
- market risk       credit risk
- analytics       exposure analytics
-       |             |
-       +------+------+
+       +------+------+------+
+       |             |      |
+       v             v      v
+ market risk   credit risk regulatory
+ analytics     exposure    readiness
+               analytics
+       |             |      |
+       +------+------+------+
               v
    local methodology retrieval
               v
@@ -108,6 +113,7 @@ Canonical source packages:
 - `src/validators/`: market, stress, PFE, methodology, and commentary validation.
 - `src/market_risk/`: market metrics, report assembly, and stress testing.
 - `src/credit_risk/`: counterparty exposure and PFE analytics.
+- `src/regulatory_risk/`: SA-CCR and SIMM / RegIM readiness screening.
 - `src/knowledge/`: local methodology retrieval.
 - `src/reporting/`: commentary generation and report formatting utilities.
 
@@ -117,7 +123,7 @@ Canonical imports use the package paths above. See [docs/architecture.md](docs/a
 
 The combined workflow returns an `AgentRunResult` that separates presentation from internal execution details:
 
-- `user_report`: clean user-facing market-risk and credit-risk summary.
+- `user_report`: clean user-facing market-risk, credit-risk, and regulatory-readiness summary.
 - `execution_trace`: auditable workflow and tool execution records.
 - `validation_result`: structured guardrail checks, errors, and warnings.
 - `raw_outputs`: underlying market-risk and credit-risk analytics outputs.
@@ -135,6 +141,7 @@ Generated reports pass through deterministic validation covering:
 - Stress loss, stressed value, and contribution consistency
 - PFE, peak-time, and EPE consistency
 - Credit limit utilization status for configured netting-set limits
+- Regulatory readiness missing-input reporting and no fabricated capital or margin numbers
 - Citations limited to retrieved methodology notes
 - Direct trade recommendations and guaranteed-outcome language
 - Presence of assumptions or limitations
@@ -210,7 +217,7 @@ python examples/failure_cases/run_report_validation_failure_demo.py
 
 ## Example Output Snapshot
 
-The full demo begins with a `Combined Executive Summary` covering the active modules: **Market Risk** and **Credit Risk**.
+The full demo begins with a `Combined Executive Summary` covering the active modules: **Market Risk**, **Credit Risk**, and **Regulatory Risk**.
 
 Representative market-risk results:
 
@@ -229,6 +236,16 @@ Representative Credit Risk results:
 - Largest netting set: NS-001
 - Validation: PASSED
 
+Representative Regulatory Risk readiness output:
+
+- SA-CCR readiness: WARNING
+- SIMM / RegIM readiness: WARNING
+- Regulatory capital calculation: Not performed
+- SA-CCR missing inputs: trade_type, notional, maturity, asset_class, supervisory_category
+- SIMM / RegIM missing inputs: risk_factor_sensitivities, margin_class, product_class, risk_factor_type, currency
+- Guardrail: no regulatory capital number is generated from insufficient inputs
+- Validation: PASSED
+
 ## Limitations
 
 - Planning and routing are deterministic rather than LLM-directed.
@@ -238,6 +255,7 @@ Representative Credit Risk results:
 - Stress testing uses deterministic ticker proxies rather than full revaluation.
 - PFE analytics consume supplied profiles rather than generating exposures from trades.
 - XVA, PD/LGD/EAD, SIMM, and RegIM are not implemented.
+- SA-CCR readiness is screened, but SA-CCR capital is not calculated.
 - Methodology retrieval is local and keyword-based, without embeddings or vector search.
 - Tool execution is synchronous and in-process, with no durable workflow state.
 - LLM commentary quality depends on the configured model despite deterministic validation controls.

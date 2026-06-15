@@ -10,6 +10,7 @@ MODULE_LABELS = {
     "shared": "Shared",
     "market_risk": "Market Risk",
     "credit_risk": "Credit Risk",
+    "regulatory_risk": "Regulatory Risk",
 }
 
 
@@ -34,7 +35,7 @@ def print_input_summary(
 def print_registered_tools_by_module(tools: Iterable[RiskTool]) -> None:
     print("Registered Risk Tools")
     tool_list = list(tools)
-    for module in ("shared", "market_risk", "credit_risk"):
+    for module in ("shared", "market_risk", "credit_risk", "regulatory_risk"):
         module_tools = [tool for tool in tool_list if tool.module == module]
         if not module_tools:
             continue

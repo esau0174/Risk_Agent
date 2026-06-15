@@ -8,7 +8,7 @@ The calculations remain authoritative. The LLM explains calculated results; it d
 
 ## High-Level Design
 
-RiskFlow Agent separates deterministic workflow orchestration from domain analytics. Shared tools route structured inputs into market-risk or credit-risk modules, local methodology retrieval grounds commentary, and deterministic validators enforce numerical and policy guardrails. A presentation layer produces a clean user report while retaining raw analytics, validation results, and an auditable execution trace.
+RiskFlow Agent separates deterministic workflow orchestration from domain analytics. Shared tools route structured inputs into market-risk, credit-risk, or regulatory-readiness modules, local methodology retrieval grounds commentary, and deterministic validators enforce numerical and policy guardrails. A presentation layer produces a clean user report while retaining raw analytics, validation results, and an auditable execution trace.
 
 ## Why This Is an Agentic Workflow
 
@@ -78,11 +78,11 @@ The combined presentation workflow runs both routes and returns `AgentRunResult`
 - `validation_result`: combined market and credit validation outcomes.
 - `raw_outputs`: complete underlying route results for further inspection.
 
-This keeps internal workflow evidence available without printing it alongside the user-facing report.
+The combined presentation layer also runs a regulatory-readiness screen for downstream SA-CCR and SIMM / RegIM workflows. This keeps internal workflow evidence available without printing it alongside the user-facing report.
 
 ## Shared Tool Infrastructure
 
-The canonical implementation is organized into eight packages:
+The canonical implementation is organized into nine packages:
 
 - `src/core/`: tool registry, tool execution, and risk configuration.
 - `src/data/`: portfolio loading and parsing, portfolio calculations, and market data access.
@@ -90,12 +90,13 @@ The canonical implementation is organized into eight packages:
 - `src/validators/`: market, stress, credit/PFE, methodology, and commentary guardrail validation.
 - `src/market_risk/`: historical market-risk metrics, report assembly, and deterministic stress testing.
 - `src/credit_risk/`: counterparty exposure and PFE summary analytics.
+- `src/regulatory_risk/`: SA-CCR and SIMM / RegIM readiness screening.
 - `src/knowledge/`: local methodology loading and keyword-based retrieval.
 - `src/reporting/`: LLM and fallback commentary generation plus report formatting utilities.
 
 Within `src/core/`:
 
-- `tool_registry.py` defines `RiskTool` metadata and registered handlers grouped as `shared`, `market_risk`, or `credit_risk`.
+- `tool_registry.py` defines `RiskTool` metadata and registered handlers grouped as `shared`, `market_risk`, `credit_risk`, or `regulatory_risk`.
 - `tool_executor.py` resolves tools by name and returns structured `ToolResult` objects with status, output, error, and metadata.
 - `risk_config.py` loads and validates calculation configuration.
 
@@ -136,6 +137,12 @@ Market prices are downloaded by `src/data/market_data.py`; portfolio return calc
 The module consumes supplied profile data; it does not generate exposures from trade pricing or Monte Carlo simulation.
 When `credit_limits` are configured by netting set, utilization is calculated as Peak 95% PFE divided by the configured limit. Limit status values are `PASSED`, `WARNING`, or `BREACHED`.
 
+## Regulatory Risk Module
+
+`src/regulatory_risk/readiness.py` screens whether available inputs are sufficient for downstream SA-CCR and SIMM / RegIM workflows. It reports structured readiness status and missing required fields. It does not calculate SA-CCR capital, SIMM margin, or RegIM margin.
+
+The full demo includes this readiness screen as a third high-level section and validates that no regulatory capital or margin number is fabricated when required inputs are missing.
+
 ## Methodology Retrieval
 
 `src/knowledge/rag.py` loads Markdown notes from `docs/` and applies deterministic keyword scoring. Market workflows build a query from the user instruction and calculated report. PFE workflows restrict retrieval to counterparty-relevant note titles and use PFE, EPE, exposure-profile, and netting-set terms.
@@ -155,6 +162,7 @@ The prompt instructs the model to use only supplied calculations, avoid invented
 - `market.py`: portfolio and market-metric consistency.
 - `stress.py`: stress-result consistency and missing-analysis warnings.
 - `credit.py`: PFE, EPE, and credit limit utilization consistency.
+- `regulatory.py`: regulatory readiness status, missing-field reporting, and no fabricated capital or margin numbers.
 - `guardrails.py`: direct recommendation, assumptions/limitations, and guaranteed-outcome checks.
 - `methodology.py`: cited-note grounding.
 - `common.py`: shared validation result types and helpers.

@@ -17,6 +17,7 @@ from src.market_risk.stress_testing import run_stress_test
 from src.knowledge.rag import retrieve_relevant_methodology
 from src.report_validator import validate_generated_report
 from src.core.risk_config import load_risk_config
+from src.regulatory_risk.readiness import assess_regulatory_readiness
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,13 @@ _REGISTERED_TOOLS: tuple[RiskTool, ...] = (
         description="Calculate peak PFE and expected exposure profile metrics.",
         callable_name="src.counterparty_risk.calculate_pfe_metrics",
         handler=calculate_pfe_metrics,
+    ),
+    RiskTool(
+        name="assess_regulatory_readiness",
+        module="regulatory_risk",
+        description="Assess input readiness for SA-CCR and SIMM / RegIM workflows.",
+        callable_name="src.regulatory_risk.assess_regulatory_readiness",
+        handler=assess_regulatory_readiness,
     ),
     RiskTool(
         name="validate_portfolio",
@@ -118,7 +126,7 @@ def list_registered_tools() -> list[RiskTool]:
 
 def list_tools_by_module(module: str) -> list[RiskTool]:
     """Return registered tools belonging to a supported risk module."""
-    supported_modules = {"shared", "market_risk", "credit_risk"}
+    supported_modules = {"shared", "market_risk", "credit_risk", "regulatory_risk"}
     if module not in supported_modules:
         supported = ", ".join(sorted(supported_modules))
         raise ValueError(

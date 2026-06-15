@@ -113,16 +113,26 @@ def test_full_workflow_returns_structured_agent_run_result(monkeypatch):
     assert "EPE: USD 1,080,000.00" in result.user_report
     assert "Limit utilization: 84.00% of USD 2,500,000.00" in result.user_report
     assert "Limit status: PASSED" in result.user_report
-    assert len(result.execution_trace) == 4
+    assert "Regulatory Risk" in result.user_report
+    assert "SA-CCR readiness: WARNING" in result.user_report
+    assert "SIMM / RegIM readiness: WARNING" in result.user_report
+    assert "Regulatory capital calculation: Not performed" in result.user_report
+    assert "SA-CCR missing inputs: trade_type, notional" in result.user_report
+    assert "SIMM / RegIM missing inputs: risk_factor_sensitivities" in result.user_report
+    assert "Validation: PASSED" in result.user_report
+    assert len(result.execution_trace) == 5
     assert all(isinstance(entry, dict) for entry in result.execution_trace)
     assert {entry["workflow"] for entry in result.execution_trace} == {
         "market_risk",
         "credit_risk",
+        "regulatory_risk",
     }
     assert result.validation_result["passed"] is True
     assert result.validation_result["market_risk"]["passed"] is True
+    assert result.validation_result["regulatory_risk"]["passed"] is True
     assert result.raw_outputs["market_risk"]["risk_report"] is not None
     assert result.raw_outputs["credit_risk"]["pfe_result"] is not None
+    assert result.raw_outputs["regulatory_risk"]["overall_status"] == "WARNING"
 
 
 def test_combined_trace_preserves_credit_exposure_loading_display_name():
@@ -140,7 +150,11 @@ def test_combined_trace_preserves_credit_exposure_loading_display_name():
         ),
     )
 
-    trace = presentation._combine_execution_traces(market_result, credit_result)
+    trace = presentation._combine_execution_traces(
+        market_result,
+        credit_result,
+        {"missing_inputs": []},
+    )
     credit_tools = [
         entry["tool_name"]
         for entry in trace
