@@ -442,10 +442,15 @@ def _build_fallback_commentary(
         references = " Methodology references: " + ", ".join(methodology_titles) + "."
 
     stress_section = _build_fallback_stress_section(stress_results or [])
+    historical_period = (
+        f"from {metadata['start_date']} to {metadata['end_date']}"
+        if metadata.get("end_date")
+        else f"since {metadata['start_date']}"
+    )
 
     return (
-        f"The workflow analyzed {', '.join(tickers)} using historical data since "
-        f"{metadata['start_date']}. Annualized volatility is "
+        f"The workflow analyzed {', '.join(tickers)} using historical data "
+        f"{historical_period}. Annualized volatility is "
         f"{metrics['annualized_volatility']:.2%}, 95% historical VaR is "
         f"{metrics['historical_var']:.2%}. Based on the historical daily return "
         "distribution, losses exceeded this threshold in approximately the worst 5% "

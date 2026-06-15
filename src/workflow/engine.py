@@ -166,6 +166,7 @@ def run_risk_workflow(
         tickers,
         weights,
         start_date=risk_config.market_data.start_date,
+        end_date=risk_config.market_data.end_date,
         risk_config=risk_config,
     )
     metric_names = ", ".join(risk_report["risk_metrics"].keys())

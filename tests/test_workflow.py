@@ -370,6 +370,7 @@ def test_run_risk_workflow_loads_config_file_through_executor(tmp_path):
 
     def capture_configured_report(*args, **kwargs):
         captured["start_date"] = kwargs["start_date"]
+        captured["end_date"] = kwargs["end_date"]
         captured["risk_config"] = kwargs["risk_config"]
         return _fake_generate_portfolio_risk_report(*args, **kwargs)
 
@@ -391,6 +392,7 @@ def test_run_risk_workflow_loads_config_file_through_executor(tmp_path):
         entry.tool_name for entry in result.execution_trace
     ]
     assert captured["start_date"] == "2024-01-01"
+    assert captured["end_date"] == "2024-06-30"
     assert captured["risk_config"].market_data.end_date == "2024-06-30"
     assert captured["risk_config"].returns.annualization_factor == 250
     assert captured["risk_config"].var.confidence_level == 0.99

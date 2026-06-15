@@ -168,6 +168,8 @@ Run the recommended combined market-risk and credit-risk demo:
 python examples/run_full_risk_agent_demo.py
 ```
 
+For more reproducible market-risk output, the official demo fetches live historical market data for the fixed window from `2023-01-01` through `2024-12-31`, as configured in `examples/sample_risk_config.json`.
+
 Optionally save its execution trace as JSON:
 
 ```bash

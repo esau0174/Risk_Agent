@@ -92,3 +92,33 @@ def test_fallback_commentary_includes_formatted_metrics_and_stress_results():
     assert "stressed portfolio value 82.50" in commentary
     assert "NVDA (6.00%)" in commentary
     assert "deterministic proxy stress test, not a full factor model" in commentary
+    assert "using historical data since 2023-01-01" in commentary
+
+
+def test_fallback_commentary_uses_configured_historical_date_range():
+    risk_report = {
+        "metadata": {
+            "tickers": ["SPY"],
+            "weights": [1.0],
+            "start_date": "2023-01-01",
+            "end_date": "2024-12-31",
+            "confidence_level": 0.95,
+        },
+        "risk_metrics": {
+            "annualized_volatility": 0.20,
+            "historical_var": 0.02,
+            "expected_shortfall": 0.03,
+            "max_drawdown": 0.15,
+        },
+        "latest_cumulative_return": 0.25,
+        "number_of_observations": 100,
+    }
+
+    commentary = generate_risk_commentary(
+        "Analyze the portfolio.",
+        risk_report,
+        [],
+        use_llm=False,
+    )
+
+    assert "using historical data from 2023-01-01 to 2024-12-31" in commentary
