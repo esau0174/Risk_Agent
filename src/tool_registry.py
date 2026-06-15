@@ -1,4 +1,4 @@
-"""Compatibility exports for the core tool registry."""
+"""Compatibility wrapper for src.core.tool_registry. New code should import from src.core.tool_registry."""
 
 from src.core.tool_registry import (
     RiskTool,

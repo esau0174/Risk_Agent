@@ -1,4 +1,4 @@
-"""Compatibility exports for core risk configuration."""
+"""Compatibility wrapper for src.core.risk_config. New code should import from src.core.risk_config."""
 
 from src.core.risk_config import (
     MarketDataConfig,

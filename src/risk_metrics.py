@@ -1,4 +1,4 @@
-"""Compatibility exports for market risk metrics."""
+"""Compatibility wrapper for src.market_risk.risk_metrics. New code should import from src.market_risk.risk_metrics."""
 
 from src.market_risk.risk_metrics import (
     annualized_volatility,

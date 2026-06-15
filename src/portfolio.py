@@ -1,4 +1,4 @@
-"""Compatibility exports for portfolio calculations and validation."""
+"""Compatibility wrapper for src.data.portfolio. New code should import from src.data.portfolio."""
 
 from src.data.portfolio import (
     calculate_asset_returns,

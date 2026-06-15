@@ -1,4 +1,4 @@
-"""Compatibility export for historical market data loading."""
+"""Compatibility wrapper for src.data.market_data. New code should import from src.data.market_data."""
 
 from src.data.market_data import download_price_data
 

@@ -1,4 +1,4 @@
-"""Compatibility exports for structured portfolio data loading."""
+"""Compatibility wrapper for src.data.portfolio_loader. New code should import from src.data.portfolio_loader."""
 
 from src.data.portfolio_loader import (
     EXPOSURE_PROFILE_COLUMNS,

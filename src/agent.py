@@ -1,4 +1,4 @@
-"""Compatibility exports for risk commentary generation."""
+"""Compatibility wrapper for src.reporting.agent. New code should import from src.reporting.agent."""
 
 from src.reporting.agent import (
     _build_commentary_facts,
