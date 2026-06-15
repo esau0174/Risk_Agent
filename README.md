@@ -83,14 +83,21 @@ Risk_Agent/
 |   |-- credit_risk/
 |   |   |-- __init__.py
 |   |   `-- counterparty_risk.py
-|   |-- market_data.py
+|   |-- data/
+|   |   |-- __init__.py
+|   |   |-- market_data.py
+|   |   |-- portfolio.py
+|   |   |-- portfolio_loader.py
+|   |   `-- portfolio_parser.py
+|   |-- market_data.py (compatibility export)
 |   |-- market_risk/
 |   |   |-- __init__.py
 |   |   |-- risk_metrics.py
 |   |   |-- risk_report.py
 |   |   `-- stress_testing.py
-|   |-- portfolio.py
-|   |-- portfolio_parser.py
+|   |-- portfolio.py (compatibility export)
+|   |-- portfolio_loader.py (compatibility export)
+|   |-- portfolio_parser.py (compatibility export)
 |   |-- rag.py
 |   |-- report_validator.py
 |   |-- risk_metrics.py (compatibility export)

@@ -2,12 +2,18 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.portfolio import (
+from src.data.portfolio import (
     calculate_asset_returns,
     calculate_cumulative_returns,
     calculate_portfolio_returns,
     validate_weights,
 )
+
+
+def test_legacy_portfolio_import_remains_compatible():
+    from src.portfolio import validate_weights as legacy_validate_weights
+
+    assert legacy_validate_weights is validate_weights
 
 
 def test_validate_weights_rejects_length_mismatch():

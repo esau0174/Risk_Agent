@@ -5,7 +5,7 @@ import json
 import pandas as pd
 import pytest
 
-from src.portfolio_loader import (
+from src.data.portfolio_loader import (
     ExposureProfile,
     detect_file_schema,
     load_portfolio_file,
@@ -17,6 +17,14 @@ EXPECTED_PORTFOLIO = {
     "tickers": ["SPY", "QQQ", "NVDA", "TLT"],
     "weights": [0.4, 0.3, 0.2, 0.1],
 }
+
+
+def test_legacy_portfolio_loader_import_remains_compatible():
+    from src.portfolio_loader import ExposureProfile as LegacyExposureProfile
+    from src.portfolio_loader import load_portfolio_file as legacy_load
+
+    assert LegacyExposureProfile is ExposureProfile
+    assert legacy_load is load_portfolio_file
 
 
 def test_load_portfolio_from_csv(tmp_path):

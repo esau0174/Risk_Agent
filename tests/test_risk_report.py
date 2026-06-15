@@ -21,6 +21,13 @@ def test_legacy_risk_report_import_remains_compatible():
     assert legacy_generate is risk_report.generate_portfolio_risk_report
 
 
+def test_legacy_market_data_import_remains_compatible():
+    from src.data.market_data import download_price_data
+    from src.market_data import download_price_data as legacy_download
+
+    assert legacy_download is download_price_data
+
+
 def test_generate_portfolio_risk_report_uses_synthetic_price_data(monkeypatch):
     prices = pd.DataFrame(
         {

@@ -4,18 +4,18 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from src.core.risk_config import RiskConfig
-from src.market_data import download_price_data
+from src.data.market_data import download_price_data
+from src.data.portfolio import (
+    calculate_asset_returns,
+    calculate_cumulative_returns,
+    calculate_portfolio_returns,
+)
 from src.market_risk.risk_metrics import (
     annualized_volatility,
     correlation_matrix,
     expected_shortfall,
     historical_var,
     max_drawdown,
-)
-from src.portfolio import (
-    calculate_asset_returns,
-    calculate_cumulative_returns,
-    calculate_portfolio_returns,
 )
 
 

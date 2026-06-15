@@ -9,11 +9,11 @@ from src.agent import (
     regenerate_risk_commentary_with_validation_errors,
 )
 from src.credit_risk.counterparty_risk import calculate_pfe_metrics
+from src.data.portfolio import validate_weights
+from src.data.portfolio_loader import load_portfolio_file
+from src.data.portfolio_parser import parse_portfolio_text
 from src.market_risk.risk_report import generate_portfolio_risk_report
 from src.market_risk.stress_testing import run_stress_test
-from src.portfolio import validate_weights
-from src.portfolio_loader import load_portfolio_file
-from src.portfolio_parser import parse_portfolio_text
 from src.rag import retrieve_relevant_methodology
 from src.report_validator import validate_generated_report
 from src.core.risk_config import load_risk_config

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from src.portfolio_loader import ExposureProfile
+from src.data.portfolio_loader import ExposureProfile
 from src.core.tool_registry import get_tool
 from src.workflow.types import ExecutionTraceEntry, WorkflowPlan, WorkflowStep
 

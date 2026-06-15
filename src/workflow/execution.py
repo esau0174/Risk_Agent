@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from src.portfolio_loader import ExposureProfile
+from src.data.portfolio_loader import ExposureProfile
 from src.core.tool_executor import ToolExecutor
 from src.workflow.types import ExecutionTraceEntry, WorkflowPlan
 

@@ -29,7 +29,7 @@ The primary entry point is `run_risk_workflow()` from `src.workflow`. It accepts
 
 `portfolio_file` remains a backward-compatible alias for `data_file`; supplying both raises an error.
 
-Without `data_file`, the query is parsed for market portfolio tickers and weights. With `data_file`, `portfolio_loader.py` detects one of two supported schemas:
+Without `data_file`, the query is parsed for market portfolio tickers and weights. With `data_file`, `src/data/portfolio_loader.py` detects one of two supported schemas:
 
 - Market portfolio: `ticker`, `weight`.
 - Counterparty exposure profile: `netting_set`, `time_years`, `expected_exposure`, `pfe_95`, with optional `pfe_99`, `currency`, and `counterparty`.
@@ -76,10 +76,17 @@ Shared core infrastructure lives in `src/core/`:
 
 The original `src/tool_registry.py`, `src/tool_executor.py`, and `src/risk_config.py` paths remain as lightweight compatibility exports.
 
-Other shared application modules currently remain directly under `src/`:
+Data input and portfolio utilities live in `src/data/`:
 
 - `portfolio_loader.py` loads and validates supported structured data schemas.
 - `portfolio_parser.py` parses natural-language market portfolios.
+- `portfolio.py` validates weights and calculates asset, portfolio, and cumulative returns.
+- `market_data.py` downloads adjusted close market data.
+
+The original root-level data module paths remain as lightweight compatibility exports.
+
+Other shared application modules currently remain directly under `src/`:
+
 - `rag.py` loads and ranks local methodology documents.
 - `agent.py` builds prompts and produces LLM or deterministic fallback commentary.
 
@@ -93,7 +100,7 @@ The registry includes input adapters, market and credit calculations, methodolog
 - `risk_report.py`: market-data retrieval, return calculations, configured metric calculation, and report assembly.
 - `stress_testing.py`: deterministic ticker-based equity, technology, and rates proxy scenarios.
 
-Market prices are downloaded by `market_data.py`; portfolio return calculations and weight validation remain in `portfolio.py`. The flat `src/risk_metrics.py`, `src/risk_report.py`, and `src/stress_testing.py` modules are compatibility exports for older import paths.
+Market prices are downloaded by `src/data/market_data.py`; portfolio return calculations and weight validation live in `src/data/portfolio.py`. The flat `src/risk_metrics.py`, `src/risk_report.py`, and `src/stress_testing.py` modules are compatibility exports for older import paths.
 
 ## Credit Risk / PFE Module
 

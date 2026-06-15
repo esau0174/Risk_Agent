@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 
 from src.credit_risk.counterparty_risk import calculate_pfe_metrics
-from src.portfolio_loader import ExposureProfile, ExposureProfileRow
 from src.core.tool_executor import ToolExecutor
+from src.data.portfolio_loader import ExposureProfile, ExposureProfileRow
 
 
 def test_legacy_counterparty_risk_import_remains_compatible():

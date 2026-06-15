@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from src.portfolio_loader import ExposureProfile, ExposureProfileRow
+from src.data.portfolio_loader import ExposureProfile, ExposureProfileRow
 
 
 def calculate_pfe_metrics(exposure_profile: ExposureProfile) -> dict:
