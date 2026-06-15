@@ -1,253 +1,209 @@
-# FinRisk Agent: LLM-Powered Portfolio Risk Analyst
+# FinRisk Agent
 
-FinRisk Agent is a financial risk copilot that parses natural-language portfolio queries, computes risk metrics using Python tools, retrieves local methodology notes with simple RAG, and generates analyst-style risk commentary.
+FinRisk Agent is an agentic financial risk workflow demo built around deterministic Python analytics. It combines explicit workflow planning, registered tool execution, runtime tracing, local methodology retrieval, LLM or deterministic commentary, and a validation gate.
 
-The project is designed to demonstrate practical financial risk analytics, clean Python engineering, lightweight retrieval-augmented generation, and guardrails against unsupported investment advice.
+The project supports market-risk and counterparty-exposure workflows through one orchestration engine. Risk calculations remain authoritative; generated commentary explains supplied results and is checked against them before the workflow returns.
 
-## Key Features
+This is an engineering and analytics demonstration, not a production risk platform or investment advisory system.
 
-- Natural language portfolio parsing
-- Historical market data download
-- Portfolio return calculation
+## Why It Is Agentic
+
+FinRisk Agent does more than call an LLM from a script. The workflow makes planning and execution explicit:
+
+- A deterministic planner builds the expected sequence of steps.
+- A tool registry exposes named shared, market-risk, and credit-risk capabilities.
+- `ToolExecutor` invokes registered handlers and returns structured results.
+- An execution trace records actual tool calls, statuses, inputs, outputs, and errors.
+- Data schema detection routes market portfolios and exposure profiles through different analytical paths.
+- Commentary is grounded in calculated results and retrieved methodology.
+- A validation gate checks numerical consistency and policy guardrails, with one controlled commentary retry when required.
+
+The current planner is rule-based. The LLM does not autonomously select tools or calculate risk metrics.
+
+## Supported Workflows
+
+### Market Risk
+
+The market-risk path accepts ticker weights, loads historical market data, calculates portfolio returns, and produces:
+
 - Annualized volatility
-- Historical VaR
-- Expected Shortfall
+- Historical Value at Risk (VaR)
+- Expected Shortfall (ES)
 - Maximum drawdown
-- Correlation matrix
-- LLM-generated risk commentary
-- Local RAG methodology retrieval
-- Finance-aware concentration analysis
-- Guardrails against investment advice
+- Correlation matrix support in the calculation layer
+- Largest-weight and ticker-composition concentration analysis
+- Optional deterministic equity, technology, and rates stress scenarios
 
-## Current Status
+VaR, ES, and drawdown are reported as positive loss magnitudes.
 
-The project currently includes the Python risk analytics backend, rule-based portfolio parsing, explicit agentic workflow orchestration, a lightweight ToolExecutor layer, a minimal OpenAI-powered commentary agent, simple local RAG over methodology notes, and a Streamlit UI. Vector search and formal tool-calling workflows are planned future improvements.
+### Credit Risk / PFE
+
+The credit-risk path accepts a supplied counterparty exposure profile and calculates:
+
+- Peak PFE at 95%
+- Peak PFE at 99%, when available
+- Time of peak PFE
+- Average Expected Exposure / EPE
+- Maximum expected exposure
+- Expected exposure by netting set
+- Largest netting set by peak PFE
+
+This path summarizes supplied exposure profiles. It does not generate exposures through a pricing or Monte Carlo engine.
+
+## Input Model
+
+The shared entry point is `run_risk_workflow()` from `src.workflow`:
+
+- `query`: natural-language analysis instruction.
+- `data_file`: optional CSV, XLSX, or JSON holdings or exposure-profile file.
+- `config_file`: optional JSON calculation and reporting configuration.
+
+Without `data_file`, the market portfolio can be parsed from the query. The legacy `portfolio_file` parameter remains available as a backward-compatible alias.
+
+Supported file schemas:
+
+```text
+Market portfolio: ticker, weight
+Exposure profile: netting_set, time_years, expected_exposure, pfe_95
+Optional exposure fields: pfe_99, currency, counterparty
+```
 
 ## Architecture
 
 ```text
-User query
-  -> portfolio parser
-  -> risk report engine
-  -> local RAG retrieval
-  -> LLM commentary generation
+query + data_file + config_file
+              |
+              v
+     deterministic workflow plan
+              |
+              v
+     registered tool execution
+              |
+       +------+------+
+       |             |
+       v             v
+ market risk     credit risk / PFE
+ analytics       exposure analytics
+       |             |
+       +------+------+
+              v
+   local methodology retrieval
+              v
+ LLM or deterministic commentary
+              v
+ validation and guardrail checks
+              v
+ WorkflowResult + execution trace
 ```
 
-At a high level, the rule-based parser extracts tickers and weights from plain English. The risk report engine downloads historical prices, calculates returns, and computes risk metrics. The local RAG layer retrieves relevant methodology notes from `docs/`. The LLM then generates commentary grounded in the calculated report and retrieved methodology snippets.
+Canonical source packages:
 
-## Agentic Workflow Orchestration
+- `src/core/`: tool registry, tool executor, and risk configuration.
+- `src/data/`: file loading, natural-language portfolio parsing, portfolio calculations, and market data.
+- `src/workflow/`: planner, engine, execution helpers, trace handling, and result types.
+- `src/validators/`: market, stress, PFE, methodology, and commentary validation.
+- `src/market_risk/`: market metrics, report assembly, and stress testing.
+- `src/credit_risk/`: counterparty exposure and PFE analytics.
+- `src/knowledge/`: local methodology retrieval.
+- `src/reporting/`: commentary generation and report formatting utilities.
 
-FinRisk Agent now uses an explicit multi-step workflow that makes planning and execution traceable:
+Root-level modules under `src/` remain as lightweight compatibility wrappers for older import paths. See [docs/architecture.md](docs/architecture.md) for implementation details.
 
-```text
-natural-language query
-  -> portfolio parsing
-  -> input validation
-  -> risk metric calculation
-  -> methodology retrieval
-  -> commentary generation
-```
+## Validation And Guardrails
 
-The workflow layer records each step, status, and output summary, making the agent behavior easier to test, audit, and extend.
+Generated reports pass through deterministic validation covering:
 
-### Tool Registry
+- Portfolio weight consistency
+- Positive-loss VaR, ES, and drawdown conventions
+- Expected Shortfall greater than or equal to VaR
+- Commentary percentages versus calculated market metrics
+- Stress loss, stressed value, and contribution consistency
+- PFE, peak-time, and EPE consistency
+- Citations limited to retrieved methodology notes
+- Direct trade recommendations and guaranteed-outcome language
+- Presence of assumptions or limitations
 
-The workflow exposes deterministic risk analytics capabilities as registered tools. The current registry includes portfolio parsing, input validation, risk metric calculation, methodology retrieval, commentary generation, and report validation. A lightweight ToolExecutor resolves each registered handler by name and returns a structured execution result, keeping tool availability and invocation explicit without changing the underlying risk calculation logic.
-
-### Report Validation Gate
-
-After commentary generation, the workflow runs deterministic validation checks before accepting the final report. The validation gate checks risk metric sign conventions, Expected Shortfall versus VaR consistency, portfolio weight consistency, unsupported investment advice, assumptions and limitations, and methodology grounding against retrieved notes.
-
-## Project Structure
-
-```text
-Risk_Agent/
-|-- docs/
-|   |-- concentration_risk.md
-|   |-- expected_shortfall.md
-|   |-- historical_var.md
-|   |-- max_drawdown.md
-|   `-- model_limitations.md
-|-- examples/
-|   |-- run_credit_risk_demo.py
-|   |-- run_llm_agent_demo.py
-|   |-- run_phase1_demo.py
-|   `-- run_text_query_demo.py
-|-- src/
-|   |-- agent.py (compatibility export)
-|   |-- core/
-|   |   |-- __init__.py
-|   |   |-- risk_config.py
-|   |   |-- tool_executor.py
-|   |   `-- tool_registry.py
-|   |-- credit_risk/
-|   |   |-- __init__.py
-|   |   `-- counterparty_risk.py
-|   |-- data/
-|   |   |-- __init__.py
-|   |   |-- market_data.py
-|   |   |-- portfolio.py
-|   |   |-- portfolio_loader.py
-|   |   `-- portfolio_parser.py
-|   |-- knowledge/
-|   |   |-- __init__.py
-|   |   `-- rag.py
-|   |-- market_data.py (compatibility export)
-|   |-- market_risk/
-|   |   |-- __init__.py
-|   |   |-- risk_metrics.py
-|   |   |-- risk_report.py
-|   |   `-- stress_testing.py
-|   |-- portfolio.py (compatibility export)
-|   |-- portfolio_loader.py (compatibility export)
-|   |-- portfolio_parser.py (compatibility export)
-|   |-- rag.py (compatibility export)
-|   |-- report_validator.py
-|   |-- report_generator.py (compatibility module)
-|   |-- reporting/
-|   |   |-- __init__.py
-|   |   |-- agent.py
-|   |   `-- report_generator.py
-|   |-- risk_metrics.py (compatibility export)
-|   |-- risk_report.py (compatibility export)
-|   |-- stress_testing.py (compatibility export)
-|   |-- counterparty_risk.py (compatibility export)
-|   |-- risk_config.py (compatibility export)
-|   |-- tool_executor.py (compatibility export)
-|   |-- tool_registry.py (compatibility export)
-|   |-- validators/
-|   |   |-- __init__.py
-|   |   |-- common.py
-|   |   |-- credit.py
-|   |   |-- guardrails.py
-|   |   |-- market.py
-|   |   |-- methodology.py
-|   |   `-- stress.py
-|   `-- workflow/
-|       |-- __init__.py
-|       |-- execution.py
-|       |-- engine.py
-|       |-- planner.py
-|       `-- types.py
-|-- tests/
-|   |-- test_agent.py
-|   |-- test_portfolio.py
-|   |-- test_portfolio_parser.py
-|   |-- test_rag.py
-|   |-- test_report_validator.py
-|   |-- test_risk_metrics.py
-|   |-- test_risk_report.py
-|   |-- test_tool_registry.py
-|   `-- test_workflow.py
-|-- app.py
-|-- .env.example
-|-- pytest.ini
-|-- requirements.txt
-`-- README.md
-```
+If commentary fails validation, the workflow permits one regeneration attempt and validates the revised output again. It does not retry indefinitely.
 
 ## Installation
 
 Requires Python 3.10+.
 
-Install the project dependencies:
-
 ```bash
 pip install -r requirements.txt
 ```
 
-## Environment Setup
-
-Create a local `.env` file with your OpenAI API key:
+For LLM commentary, create a local `.env` file:
 
 ```text
 OPENAI_API_KEY=your_api_key_here
 ```
 
-Do not commit `.env` or any real API keys to version control. Use `.env.example` as the template for required environment variables.
+Do not commit `.env` or API keys. The credit-risk demo uses deterministic commentary and does not require an API key.
 
-## How To Run
+## Run
 
-Run the test suite:
-
-```bash
-pytest
-```
-
-Run the Phase 1 risk analytics demo:
+Run the complete test suite:
 
 ```bash
-python examples/run_phase1_demo.py
+pytest -q
 ```
 
-Run the rule-based natural language query demo:
-
-```bash
-python examples/run_text_query_demo.py
-```
-
-Run the LLM agent demo:
+Run the market-risk workflow demo:
 
 ```bash
 python examples/run_llm_agent_demo.py
 ```
 
-Run the counterparty exposure / PFE credit risk demo:
+Run the deterministic counterparty exposure / PFE demo:
 
 ```bash
 python examples/run_credit_risk_demo.py
 ```
 
-The LLM demo requires `OPENAI_API_KEY` to be set. If no key is available, the demo exits without calling the OpenAI API.
+The demos display registered tools, the planned workflow, the runtime execution trace, analytical results, retrieved methodology, commentary, and validation status.
 
-## Example Query
+## Example Output Snapshot
 
-```text
-Analyze a portfolio with 40% SPY, 30% QQQ, 20% NVDA, and 10% TLT. Focus on downside risk and concentration risk.
-```
+Representative market-risk demo output:
 
-## Example Output Summary
-
-For a query like the one above, FinRisk Agent parses the portfolio into tickers and weights, downloads historical adjusted close prices, and calculates metrics such as:
-
-- Annualized volatility: 26.62%
-- 95% historical VaR: 2.31%
-- 95% Expected Shortfall: 3.44%
+- Annualized volatility: 26.71%
+- 95% historical VaR: 2.32%
+- 95% Expected Shortfall: 3.47%
 - Maximum drawdown: 23.77%
-- Latest cumulative return
-- Correlation matrix
+- Stress scenario loss: 22.50%
+- Validation: PASSED
 
-The generated commentary highlights downside risk using VaR and Expected Shortfall, discusses realized drawdown, identifies the largest single position, and flags overlapping growth / technology / AI-related exposure where relevant. It also notes that bond exposure such as TLT may diversify equity risk, but hedge effectiveness depends on the rate and inflation regime.
+Representative credit-risk / PFE demo output:
 
-## Methodology Notes
-
-Local methodology notes live in `docs/` and are retrieved with deterministic keyword-based RAG:
-
-- Historical VaR
-- Expected Shortfall
-- Maximum Drawdown
-- Concentration Risk
-- Model Limitations
-
-The LLM commentary is instructed to cite only retrieved local methodology titles, such as `Methodology reference: Historical VaR`.
+- Peak 95% PFE: 2,100,000
+- Peak 99% PFE: 2,600,000
+- EPE: 1,080,000
+- Largest netting set: NS-001
+- Validation: PASSED
 
 ## Limitations
 
-- Uses historical data only
-- Focused on simple equity and ETF portfolios
-- No formal factor model yet
-- Does not provide personalized investment advice
-- RAG is keyword-based for now, not embedding-based
+- Planning and routing are deterministic rather than LLM-directed.
+- Market risk is historical and focused on simple equity/ETF portfolios.
+- Only historical VaR is implemented; no parametric or Monte Carlo VaR is available.
+- Concentration observations are based on weights and ticker composition, not a formal factor model.
+- Stress testing uses deterministic ticker proxies rather than full revaluation.
+- PFE analytics consume supplied profiles rather than generating exposures from trades.
+- XVA, PD/LGD/EAD, SIMM, and RegIM are not implemented.
+- Methodology retrieval is local and keyword-based, without embeddings or vector search.
+- Tool execution is synchronous and in-process, with no durable workflow state.
+- LLM commentary quality depends on the configured model despite deterministic validation controls.
 
-## Future Improvements
+## Future Extensions
 
-- Enhanced Streamlit workflow UI
-- Formal OpenAI tool/function calling workflow
-- Chroma or FAISS vector search
-- Factor exposure model
-- Stress scenario library
-- PDF/HTML report export
+- Add a combined market-risk and credit-risk demonstration.
+- Improve retrieval with embeddings, vector search, and stronger ranking.
+- Add formal factor exposure and richer scenario or full-revaluation stress models.
+- Generate exposure profiles from pricing simulations and extend toward XVA analytics.
+- Add durable execution state, richer observability, and PDF/HTML report export.
+- Remove compatibility wrappers after downstream imports stabilize.
 
 ## Disclaimer
 
-FinRisk Agent provides risk analytics, methodology context, and explanatory commentary. It does not provide personalized financial, investment, tax, or legal advice.
+FinRisk Agent is for analytical demonstration only and does not constitute investment advice.
