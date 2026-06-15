@@ -107,7 +107,7 @@ Canonical source packages:
 - `src/knowledge/`: local methodology retrieval.
 - `src/reporting/`: commentary generation and report formatting utilities.
 
-Root-level modules under `src/` remain as lightweight compatibility wrappers for older import paths. See [docs/architecture.md](docs/architecture.md) for implementation details.
+Canonical imports use the package paths above. See [docs/architecture.md](docs/architecture.md) for implementation details.
 
 ## Validation And Guardrails
 
@@ -197,12 +197,10 @@ Representative credit-risk / PFE demo output:
 
 ## Future Extensions
 
-- Add a combined market-risk and credit-risk demonstration.
 - Improve retrieval with embeddings, vector search, and stronger ranking.
 - Add formal factor exposure and richer scenario or full-revaluation stress models.
 - Generate exposure profiles from pricing simulations and extend toward XVA analytics.
 - Add durable execution state, richer observability, and PDF/HTML report export.
-- Remove compatibility wrappers after downstream imports stabilize.
 
 ## Disclaimer
 

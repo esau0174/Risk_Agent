@@ -95,8 +95,6 @@ Supporting shared capabilities are separated by responsibility:
 - `src/reporting/agent.py` builds prompts and produces LLM or deterministic fallback commentary.
 - `src/reporting/report_generator.py` is currently an empty placeholder.
 
-Root-level modules such as `src/tool_registry.py`, `src/portfolio_loader.py`, `src/rag.py`, and `src/agent.py` remain only as lightweight compatibility wrappers for older import paths. They are not the canonical implementations. Similar wrappers remain for relocated market-risk, credit-risk, configuration, execution, and data modules.
-
 The registry includes input adapters, market and credit calculations, methodology retrieval, commentary generation/regeneration, and report validation. It is an in-process Python registry, not a remote tool protocol or OpenAI tool-calling implementation.
 
 ## Market Risk Module
@@ -107,7 +105,7 @@ The registry includes input adapters, market and credit calculations, methodolog
 - `risk_report.py`: market-data retrieval, return calculations, configured metric calculation, and report assembly.
 - `stress_testing.py`: deterministic ticker-based equity, technology, and rates proxy scenarios.
 
-Market prices are downloaded by `src/data/market_data.py`; portfolio return calculations and weight validation live in `src/data/portfolio.py`. The flat `src/risk_metrics.py`, `src/risk_report.py`, and `src/stress_testing.py` modules are compatibility exports for older import paths.
+Market prices are downloaded by `src/data/market_data.py`; portfolio return calculations and weight validation live in `src/data/portfolio.py`.
 
 ## Credit Risk / PFE Module
 
@@ -120,7 +118,7 @@ Market prices are downloaded by `src/data/market_data.py`; portfolio return calc
 - Expected exposure totals by netting set.
 - Largest netting set by peak PFE.
 
-The module consumes supplied profile data; it does not generate exposures from trade pricing or Monte Carlo simulation. `src/counterparty_risk.py` remains as a compatibility export.
+The module consumes supplied profile data; it does not generate exposures from trade pricing or Monte Carlo simulation.
 
 ## Methodology Retrieval
 
@@ -163,8 +161,6 @@ Validation preserves deterministic check ordering and returns structured checks,
 
 Possible cleanup and extensions, not part of the current architecture, include:
 
-- Remove root-level compatibility wrappers after downstream imports stabilize and a deliberate deprecation period is complete.
-- Add a full combined demo that presents market-risk and credit-risk workflows through the shared engine.
 - Strengthen methodology retrieval with embeddings, vector search, or improved ranking while retaining source grounding.
 - Expand risk analytics with formal factor exposure, richer stress and revaluation models, pricing-engine-derived exposure profiles, and XVA extensions.
 
