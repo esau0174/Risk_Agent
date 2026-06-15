@@ -47,8 +47,10 @@ The credit-risk path accepts a supplied counterparty exposure profile and calcul
 - Maximum expected exposure
 - Expected exposure by netting set
 - Largest netting set by peak PFE
+- Optional limit utilization for the largest netting set when credit limits are configured
 
 This path summarizes supplied exposure profiles. It does not generate exposures through a pricing or Monte Carlo engine.
+When `credit_limits` are supplied by netting set, utilization is calculated as Peak 95% PFE divided by the configured limit. Limit status values are `PASSED`, `WARNING`, or `BREACHED`.
 
 ## Input Model
 
@@ -132,6 +134,7 @@ Generated reports pass through deterministic validation covering:
 - Commentary percentages versus calculated market metrics
 - Stress loss, stressed value, and contribution consistency
 - PFE, peak-time, and EPE consistency
+- Credit limit utilization status for configured netting-set limits
 - Citations limited to retrieved methodology notes
 - Direct trade recommendations and guaranteed-outcome language
 - Presence of assumptions or limitations

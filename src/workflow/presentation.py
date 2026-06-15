@@ -24,6 +24,7 @@ def run_full_risk_agent_workflow(
     credit_result = run_risk_workflow(
         credit_query,
         data_file=credit_data_file,
+        config_file=config_file,
         use_llm=use_llm,
     )
 
@@ -82,6 +83,8 @@ def _build_user_report(
                 "- Largest netting set: "
                 f"{pfe_metrics['largest_netting_set_by_peak_pfe']}"
             ),
+            _limit_utilization_line(pfe_metrics),
+            f"- Limit status: {pfe_metrics['limit_status']}",
             f"- Validation: {_validation_status(credit_result)}",
             "",
             "Market Risk Commentary",
@@ -128,3 +131,12 @@ def _build_validation_result(
 
 def _validation_status(result: WorkflowResult) -> str:
     return "PASSED" if result.validation_result.passed else "FAILED"
+
+
+def _limit_utilization_line(pfe_metrics: dict) -> str:
+    if pfe_metrics.get("limit_utilization") is None:
+        return "- Limit utilization: not available; no configured limit"
+    return (
+        f"- Limit utilization: {pfe_metrics['limit_utilization']:.2%} of "
+        f"USD {pfe_metrics['configured_limit']:,.2f}"
+    )

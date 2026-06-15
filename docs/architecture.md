@@ -131,8 +131,10 @@ Market prices are downloaded by `src/data/market_data.py`; portfolio return calc
 - Maximum expected exposure.
 - Expected exposure totals by netting set.
 - Largest netting set by peak PFE.
+- Optional credit limit utilization for the largest netting set.
 
 The module consumes supplied profile data; it does not generate exposures from trade pricing or Monte Carlo simulation.
+When `credit_limits` are configured by netting set, utilization is calculated as Peak 95% PFE divided by the configured limit. Limit status values are `PASSED`, `WARNING`, or `BREACHED`.
 
 ## Methodology Retrieval
 
@@ -152,7 +154,7 @@ The prompt instructs the model to use only supplied calculations, avoid invented
 
 - `market.py`: portfolio and market-metric consistency.
 - `stress.py`: stress-result consistency and missing-analysis warnings.
-- `credit.py`: PFE and EPE consistency.
+- `credit.py`: PFE, EPE, and credit limit utilization consistency.
 - `guardrails.py`: direct recommendation, assumptions/limitations, and guaranteed-outcome checks.
 - `methodology.py`: cited-note grounding.
 - `common.py`: shared validation result types and helpers.
