@@ -294,7 +294,7 @@ def test_exposure_profile_workflow_uses_pfe_tools_and_skips_market_tools(tmp_pat
         tool_executor=ToolExecutor(tools),
     )
 
-    expected_tools = [
+    expected_plan_steps = [
         "load_portfolio_file",
         "load_risk_config",
         "calculate_pfe_metrics",
@@ -302,8 +302,12 @@ def test_exposure_profile_workflow_uses_pfe_tools_and_skips_market_tools(tmp_pat
         "generate_commentary",
         "validate_report",
     ]
-    assert [step.name for step in result.plan.steps] == expected_tools
-    assert [entry.tool_name for entry in result.execution_trace] == expected_tools
+    expected_trace_tools = [
+        "load_exposure_profile",
+        *expected_plan_steps[1:],
+    ]
+    assert [step.name for step in result.plan.steps] == expected_plan_steps
+    assert [entry.tool_name for entry in result.execution_trace] == expected_trace_tools
     assert all(step.status == "completed" for step in result.plan.steps)
     config_step = next(
         step for step in result.plan.steps if step.name == "load_risk_config"

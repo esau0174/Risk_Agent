@@ -83,6 +83,8 @@ def test_market_and_pfe_files_use_the_same_workflow_engine(tmp_path):
     pfe_tools = [entry.tool_name for entry in pfe_result.execution_trace]
 
     assert "calculate_risk_metrics" in market_tools
+    assert pfe_tools[0] == "load_exposure_profile"
+    assert "load_portfolio_file" not in pfe_tools
     assert "calculate_pfe_metrics" in pfe_tools
     assert "calculate_risk_metrics" not in pfe_tools
     assert "validate_report" in market_tools

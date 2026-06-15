@@ -6,6 +6,14 @@ from src.report_validator import ValidationResult
 
 
 @dataclass
+class AgentRunResult:
+    user_report: str
+    execution_trace: list[dict]
+    validation_result: dict | None
+    raw_outputs: dict
+
+
+@dataclass
 class WorkflowStep:
     name: str
     description: str

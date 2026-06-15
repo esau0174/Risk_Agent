@@ -68,6 +68,7 @@ def run_risk_workflow(
             resolved_data_file,
         )
         if detect_data_route(loaded_portfolio) == "credit_risk":
+            execution_trace[-1].tool_name = "load_exposure_profile"
             plan = build_exposure_profile_workflow_plan()
             complete_step(
                 plan,
