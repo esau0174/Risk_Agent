@@ -68,33 +68,34 @@ The market route skips PFE analytics. The credit route skips portfolio-weight va
 
 ## Shared Tool Infrastructure
 
-Shared core infrastructure lives in `src/core/`:
+The canonical implementation is organized into eight packages:
+
+- `src/core/`: tool registry, tool execution, and risk configuration.
+- `src/data/`: portfolio loading and parsing, portfolio calculations, and market data access.
+- `src/workflow/`: planning, routing, orchestration, execution tracing, and workflow result types.
+- `src/validators/`: market, stress, credit/PFE, methodology, and commentary guardrail validation.
+- `src/market_risk/`: historical market-risk metrics, report assembly, and deterministic stress testing.
+- `src/credit_risk/`: counterparty exposure and PFE summary analytics.
+- `src/knowledge/`: local methodology loading and keyword-based retrieval.
+- `src/reporting/`: LLM and fallback commentary generation plus the report-generation placeholder.
+
+Within `src/core/`:
 
 - `tool_registry.py` defines `RiskTool` metadata and registered handlers grouped as `shared`, `market_risk`, or `credit_risk`.
 - `tool_executor.py` resolves tools by name and returns structured `ToolResult` objects with status, output, error, and metadata.
 - `risk_config.py` loads and validates calculation configuration.
 
-The original `src/tool_registry.py`, `src/tool_executor.py`, and `src/risk_config.py` paths remain as lightweight compatibility exports.
+Supporting shared capabilities are separated by responsibility:
 
-Data input and portfolio utilities live in `src/data/`:
+- `src/data/portfolio_loader.py` loads and validates supported structured data schemas.
+- `src/data/portfolio_parser.py` parses natural-language market portfolios.
+- `src/data/portfolio.py` validates weights and calculates asset, portfolio, and cumulative returns.
+- `src/data/market_data.py` downloads adjusted close market data.
+- `src/knowledge/rag.py` loads and ranks local methodology documents.
+- `src/reporting/agent.py` builds prompts and produces LLM or deterministic fallback commentary.
+- `src/reporting/report_generator.py` is currently an empty placeholder.
 
-- `portfolio_loader.py` loads and validates supported structured data schemas.
-- `portfolio_parser.py` parses natural-language market portfolios.
-- `portfolio.py` validates weights and calculates asset, portfolio, and cumulative returns.
-- `market_data.py` downloads adjusted close market data.
-
-The original root-level data module paths remain as lightweight compatibility exports.
-
-Knowledge retrieval lives in `src/knowledge/`:
-
-- `rag.py` loads and ranks local methodology documents.
-
-Commentary and reporting utilities live in `src/reporting/`:
-
-- `agent.py` builds prompts and produces LLM or deterministic fallback commentary.
-- `report_generator.py` currently remains an empty placeholder module.
-
-The original `src/rag.py`, `src/agent.py`, and `src/report_generator.py` paths remain as lightweight compatibility modules.
+Root-level modules such as `src/tool_registry.py`, `src/portfolio_loader.py`, `src/rag.py`, and `src/agent.py` remain only as lightweight compatibility wrappers for older import paths. They are not the canonical implementations. Similar wrappers remain for relocated market-risk, credit-risk, configuration, execution, and data modules.
 
 The registry includes input adapters, market and credit calculations, methodology retrieval, commentary generation/regeneration, and report validation. It is an in-process Python registry, not a remote tool protocol or OpenAI tool-calling implementation.
 
@@ -162,12 +163,9 @@ Validation preserves deterministic check ordering and returns structured checks,
 
 Possible cleanup and extensions, not part of the current architecture, include:
 
-- Move remaining shared root modules into clearer packages while retaining stable public imports.
-- Replace compatibility export modules after a deliberate deprecation period.
-- Introduce formal OpenAI tool/function calling for model-directed tool requests under workflow controls.
-- Add embedding-based methodology retrieval with Chroma or FAISS.
-- Add formal factor exposure, richer scenario libraries, and full-revaluation stress capabilities.
-- Add pricing-engine-derived exposure profiles and later XVA components.
-- Add durable execution state, richer observability, and report export formats.
+- Remove root-level compatibility wrappers after downstream imports stabilize and a deliberate deprecation period is complete.
+- Add a full combined demo that presents market-risk and credit-risk workflows through the shared engine.
+- Strengthen methodology retrieval with embeddings, vector search, or improved ranking while retaining source grounding.
+- Expand risk analytics with formal factor exposure, richer stress and revaluation models, pricing-engine-derived exposure profiles, and XVA extensions.
 
 These items describe direction only. The implemented system remains the deterministic, in-process workflow documented above.
