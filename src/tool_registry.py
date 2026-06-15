@@ -8,15 +8,15 @@ from src.agent import (
     generate_risk_commentary,
     regenerate_risk_commentary_with_validation_errors,
 )
-from src.counterparty_risk import calculate_pfe_metrics
+from src.credit_risk.counterparty_risk import calculate_pfe_metrics
+from src.market_risk.risk_report import generate_portfolio_risk_report
+from src.market_risk.stress_testing import run_stress_test
 from src.portfolio import validate_weights
 from src.portfolio_loader import load_portfolio_file
 from src.portfolio_parser import parse_portfolio_text
 from src.rag import retrieve_relevant_methodology
 from src.report_validator import validate_generated_report
 from src.risk_config import load_risk_config
-from src.risk_report import generate_portfolio_risk_report
-from src.stress_testing import run_stress_test
 
 
 @dataclass(frozen=True)

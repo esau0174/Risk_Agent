@@ -1,4 +1,4 @@
-"""Compatibility export for counterparty credit risk analytics."""
+"""Counterparty credit risk analytics."""
 
 from src.credit_risk.counterparty_risk import calculate_pfe_metrics
 

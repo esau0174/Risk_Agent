@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import pytest
 
-from src.counterparty_risk import calculate_pfe_metrics
+from src.credit_risk.counterparty_risk import calculate_pfe_metrics
 from src.portfolio_loader import ExposureProfile, ExposureProfileRow
 from src.tool_executor import ToolExecutor
+
+
+def test_legacy_counterparty_risk_import_remains_compatible():
+    from src.counterparty_risk import calculate_pfe_metrics as legacy_calculate
+
+    assert legacy_calculate is calculate_pfe_metrics
 
 
 def _exposure_profile() -> ExposureProfile:

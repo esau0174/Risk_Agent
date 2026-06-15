@@ -8,7 +8,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.portfolio_parser import parse_portfolio_text
-from src.risk_report import generate_portfolio_risk_report
+from src.market_risk.risk_report import generate_portfolio_risk_report
 
 
 def main() -> None:

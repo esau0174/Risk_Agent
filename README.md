@@ -75,14 +75,23 @@ Risk_Agent/
 |   `-- run_text_query_demo.py
 |-- src/
 |   |-- agent.py
+|   |-- credit_risk/
+|   |   |-- __init__.py
+|   |   `-- counterparty_risk.py
 |   |-- market_data.py
+|   |-- market_risk/
+|   |   |-- __init__.py
+|   |   |-- risk_metrics.py
+|   |   |-- risk_report.py
+|   |   `-- stress_testing.py
 |   |-- portfolio.py
 |   |-- portfolio_parser.py
 |   |-- rag.py
 |   |-- report_validator.py
-|   |-- risk_metrics.py
-|   |-- risk_report.py
-|   |-- stress_testing.py
+|   |-- risk_metrics.py (compatibility export)
+|   |-- risk_report.py (compatibility export)
+|   |-- stress_testing.py (compatibility export)
+|   |-- counterparty_risk.py (compatibility export)
 |   |-- tool_registry.py
 |   |-- validators/
 |   |   |-- __init__.py

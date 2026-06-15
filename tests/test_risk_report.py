@@ -5,7 +5,7 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
-from src import risk_report
+from src.market_risk import risk_report
 from src.risk_config import (
     MarketDataConfig,
     ReturnsConfig,
@@ -13,6 +13,12 @@ from src.risk_config import (
     RiskMetricsConfig,
     VarConfig,
 )
+
+
+def test_legacy_risk_report_import_remains_compatible():
+    from src.risk_report import generate_portfolio_risk_report as legacy_generate
+
+    assert legacy_generate is risk_report.generate_portfolio_risk_report
 
 
 def test_generate_portfolio_risk_report_uses_synthetic_price_data(monkeypatch):

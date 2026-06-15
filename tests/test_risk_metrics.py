@@ -2,13 +2,19 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.risk_metrics import (
+from src.market_risk.risk_metrics import (
     annualized_volatility,
     correlation_matrix,
     expected_shortfall,
     historical_var,
     max_drawdown,
 )
+
+
+def test_legacy_risk_metrics_import_remains_compatible():
+    from src.risk_metrics import historical_var as legacy_historical_var
+
+    assert legacy_historical_var is historical_var
 
 
 def test_annualized_volatility_scales_daily_standard_deviation():

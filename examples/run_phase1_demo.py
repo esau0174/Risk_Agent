@@ -9,7 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src.risk_report import generate_portfolio_risk_report
+from src.market_risk.risk_report import generate_portfolio_risk_report
 
 
 def main() -> None:
