@@ -351,7 +351,7 @@ def _run_exposure_profile_workflow(
     complete_step(
         plan,
         "load_risk_config",
-        f"Loaded reporting configuration; VaR confidence is {risk_config.var.confidence_level:.0%}.",
+        "Loaded reporting configuration for exposure analysis.",
     )
 
     pfe_result = execute_traced(

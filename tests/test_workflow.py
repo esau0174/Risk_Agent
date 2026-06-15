@@ -305,6 +305,12 @@ def test_exposure_profile_workflow_uses_pfe_tools_and_skips_market_tools(tmp_pat
     assert [step.name for step in result.plan.steps] == expected_tools
     assert [entry.tool_name for entry in result.execution_trace] == expected_tools
     assert all(step.status == "completed" for step in result.plan.steps)
+    config_step = next(
+        step for step in result.plan.steps if step.name == "load_risk_config"
+    )
+    assert config_step.output_summary == (
+        "Loaded reporting configuration for exposure analysis."
+    )
     assert result.parsed_portfolio is None
     assert result.risk_report is None
     assert result.stress_test_results == []
