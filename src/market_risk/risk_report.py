@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
+from src.core.risk_config import RiskConfig
 from src.market_data import download_price_data
 from src.market_risk.risk_metrics import (
     annualized_volatility,
@@ -16,7 +17,6 @@ from src.portfolio import (
     calculate_cumulative_returns,
     calculate_portfolio_returns,
 )
-from src.risk_config import RiskConfig
 
 
 def generate_portfolio_risk_report(

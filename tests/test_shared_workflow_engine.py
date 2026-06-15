@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from src.tool_executor import ToolExecutor
-from src.tool_registry import list_registered_tools
+from src.core.tool_executor import ToolExecutor
+from src.core.tool_registry import list_registered_tools
 from src.workflow import WorkflowPlan, WorkflowResult, run_risk_workflow
 
 

@@ -10,7 +10,7 @@ from src.portfolio_loader import (
     detect_file_schema,
     load_portfolio_file,
 )
-from src.tool_executor import ToolExecutor
+from src.core.tool_executor import ToolExecutor
 
 
 EXPECTED_PORTFOLIO = {

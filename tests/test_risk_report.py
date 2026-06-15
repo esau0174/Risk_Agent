@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from src.market_risk import risk_report
-from src.risk_config import (
+from src.core.risk_config import (
     MarketDataConfig,
     ReturnsConfig,
     RiskConfig,

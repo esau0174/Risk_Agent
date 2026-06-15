@@ -75,6 +75,11 @@ Risk_Agent/
 |   `-- run_text_query_demo.py
 |-- src/
 |   |-- agent.py
+|   |-- core/
+|   |   |-- __init__.py
+|   |   |-- risk_config.py
+|   |   |-- tool_executor.py
+|   |   `-- tool_registry.py
 |   |-- credit_risk/
 |   |   |-- __init__.py
 |   |   `-- counterparty_risk.py
@@ -92,7 +97,9 @@ Risk_Agent/
 |   |-- risk_report.py (compatibility export)
 |   |-- stress_testing.py (compatibility export)
 |   |-- counterparty_risk.py (compatibility export)
-|   |-- tool_registry.py
+|   |-- risk_config.py (compatibility export)
+|   |-- tool_executor.py (compatibility export)
+|   |-- tool_registry.py (compatibility export)
 |   |-- validators/
 |   |   |-- __init__.py
 |   |   |-- common.py

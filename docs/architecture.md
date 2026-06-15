@@ -34,7 +34,7 @@ Without `data_file`, the query is parsed for market portfolio tickers and weight
 - Market portfolio: `ticker`, `weight`.
 - Counterparty exposure profile: `netting_set`, `time_years`, `expected_exposure`, `pfe_95`, with optional `pfe_99`, `currency`, and `counterparty`.
 
-`risk_config.py` supplies defaults or loads configured dates, return assumptions, VaR settings, enabled metrics, reporting options, and optional deterministic stress scenarios.
+`src/core/risk_config.py` supplies defaults or loads configured dates, return assumptions, VaR settings, enabled metrics, reporting options, and optional deterministic stress scenarios.
 
 ## Workflow Engine And Routing
 
@@ -68,13 +68,18 @@ The market route skips PFE analytics. The credit route skips portfolio-weight va
 
 ## Shared Tool Infrastructure
 
-Shared infrastructure currently remains directly under `src/`:
+Shared core infrastructure lives in `src/core/`:
 
 - `tool_registry.py` defines `RiskTool` metadata and registered handlers grouped as `shared`, `market_risk`, or `credit_risk`.
 - `tool_executor.py` resolves tools by name and returns structured `ToolResult` objects with status, output, error, and metadata.
+- `risk_config.py` loads and validates calculation configuration.
+
+The original `src/tool_registry.py`, `src/tool_executor.py`, and `src/risk_config.py` paths remain as lightweight compatibility exports.
+
+Other shared application modules currently remain directly under `src/`:
+
 - `portfolio_loader.py` loads and validates supported structured data schemas.
 - `portfolio_parser.py` parses natural-language market portfolios.
-- `risk_config.py` loads and validates calculation configuration.
 - `rag.py` loads and ranks local methodology documents.
 - `agent.py` builds prompts and produces LLM or deterministic fallback commentary.
 

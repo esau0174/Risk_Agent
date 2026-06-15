@@ -5,6 +5,7 @@ from pathlib import Path
 
 
 _TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
+_NON_METHODOLOGY_DOCS = {"architecture.md"}
 
 
 def load_methodology_docs(docs_dir: str = "docs") -> list[dict]:
@@ -15,6 +16,8 @@ def load_methodology_docs(docs_dir: str = "docs") -> list[dict]:
 
     documents = []
     for path in sorted(docs_path.glob("*.md")):
+        if path.name.lower() in _NON_METHODOLOGY_DOCS:
+            continue
         content = path.read_text(encoding="utf-8")
         documents.append(
             {

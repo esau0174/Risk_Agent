@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from src.core.risk_config import RiskConfig, StressScenario, parse_stress_scenarios
 from src.portfolio import validate_weights
-from src.risk_config import RiskConfig, StressScenario, parse_stress_scenarios
 
 
 BASE_PORTFOLIO_VALUE = 100.0

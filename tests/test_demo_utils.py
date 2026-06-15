@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from src.report_validator import ValidationCheck, ValidationResult
-from src.tool_registry import list_registered_tools
+from src.core.tool_registry import list_registered_tools
 from src.workflow import ExecutionTraceEntry, WorkflowPlan, WorkflowStep
 from examples.demo_utils import (
     print_execution_trace,

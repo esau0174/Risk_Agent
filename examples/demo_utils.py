@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from src.tool_registry import RiskTool
+from src.core.tool_registry import RiskTool
 from src.workflow import ExecutionTraceEntry, WorkflowPlan
 
 

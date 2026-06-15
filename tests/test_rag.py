@@ -32,6 +32,23 @@ def test_load_methodology_docs_reads_markdown_titles(tmp_path):
     assert "Value at Risk" in docs[0]["content"]
 
 
+def test_load_methodology_docs_excludes_architecture_document(tmp_path):
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "historical_var.md").write_text(
+        "# Historical VaR\n\nValue at Risk methodology.",
+        encoding="utf-8",
+    )
+    (docs_dir / "architecture.md").write_text(
+        "# System Architecture\n\nApplication structure.",
+        encoding="utf-8",
+    )
+
+    docs = load_methodology_docs(str(docs_dir))
+
+    assert [doc["title"] for doc in docs] == ["Historical VaR"]
+
+
 def test_retrieve_relevant_methodology_scores_keyword_matches():
     docs = [
         {

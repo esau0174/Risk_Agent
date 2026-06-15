@@ -8,7 +8,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.workflow import run_risk_workflow
-from src.tool_registry import list_registered_tools
+from src.core.tool_registry import list_registered_tools
 from examples.demo_utils import (
     print_execution_trace,
     print_input_summary,

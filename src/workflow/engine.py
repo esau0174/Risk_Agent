@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from src.agent import _build_methodology_query
+from src.core.tool_executor import ToolExecutor
 from src.portfolio_loader import ExposureProfile
 from src.rag import load_methodology_docs
-from src.tool_executor import ToolExecutor
 from src.workflow.execution import (
     commentary_output_summary,
     complete_step,

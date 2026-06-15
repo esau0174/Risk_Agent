@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
+from src.core.risk_config import RiskConfig, StressScenario
+from src.core.tool_executor import ToolExecutor
 from src.market_risk.stress_testing import run_stress_test
-from src.risk_config import RiskConfig, StressScenario
-from src.tool_executor import ToolExecutor
 
 
 def test_legacy_stress_testing_import_remains_compatible():

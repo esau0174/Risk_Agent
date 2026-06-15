@@ -1,6 +1,6 @@
 import pytest
 
-from src.tool_registry import get_tool, list_registered_tools, list_tools_by_module
+from src.core.tool_registry import get_tool, list_registered_tools, list_tools_by_module
 
 
 EXPECTED_TOOL_NAMES = [
@@ -30,6 +30,13 @@ EXPECTED_TOOL_MODULES = {
     "regenerate_commentary_with_validation_errors": "shared",
     "validate_report": "shared",
 }
+
+
+def test_legacy_tool_registry_import_remains_compatible():
+    from src.tool_registry import RiskTool as LegacyRiskTool
+    from src.core.tool_registry import RiskTool
+
+    assert LegacyRiskTool is RiskTool
 
 
 def test_expected_tools_are_registered():

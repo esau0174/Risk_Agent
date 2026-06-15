@@ -4,7 +4,7 @@ import pytest
 
 from src.credit_risk.counterparty_risk import calculate_pfe_metrics
 from src.portfolio_loader import ExposureProfile, ExposureProfileRow
-from src.tool_executor import ToolExecutor
+from src.core.tool_executor import ToolExecutor
 
 
 def test_legacy_counterparty_risk_import_remains_compatible():
