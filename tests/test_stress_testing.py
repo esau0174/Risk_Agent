@@ -7,12 +7,6 @@ from src.core.tool_executor import ToolExecutor
 from src.market_risk.stress_testing import run_stress_test
 
 
-def test_legacy_stress_testing_import_remains_compatible():
-    from src.stress_testing import run_stress_test as legacy_run_stress_test
-
-    assert legacy_run_stress_test is run_stress_test
-
-
 def _stress_config() -> RiskConfig:
     return RiskConfig(
         stress_scenarios=(

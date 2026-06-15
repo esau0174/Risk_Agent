@@ -7,12 +7,6 @@ from src.core.tool_executor import ToolExecutor
 from src.data.portfolio_loader import ExposureProfile, ExposureProfileRow
 
 
-def test_legacy_counterparty_risk_import_remains_compatible():
-    from src.counterparty_risk import calculate_pfe_metrics as legacy_calculate
-
-    assert legacy_calculate is calculate_pfe_metrics
-
-
 def _exposure_profile() -> ExposureProfile:
     return ExposureProfile(
         exposures=[

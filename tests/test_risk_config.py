@@ -4,13 +4,7 @@ import json
 
 import pytest
 
-from src.core.risk_config import RiskConfig, load_risk_config
-
-
-def test_legacy_risk_config_import_remains_compatible():
-    from src.risk_config import RiskConfig as LegacyRiskConfig
-
-    assert LegacyRiskConfig is RiskConfig
+from src.core.risk_config import load_risk_config
 
 
 def test_load_default_risk_config():

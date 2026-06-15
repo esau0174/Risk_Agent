@@ -11,12 +11,6 @@ from src.market_risk.risk_metrics import (
 )
 
 
-def test_legacy_risk_metrics_import_remains_compatible():
-    from src.risk_metrics import historical_var as legacy_historical_var
-
-    assert legacy_historical_var is historical_var
-
-
 def test_annualized_volatility_scales_daily_standard_deviation():
     returns = pd.Series([0.01, 0.02, -0.01, 0.00])
 

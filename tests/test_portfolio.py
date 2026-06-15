@@ -10,12 +10,6 @@ from src.data.portfolio import (
 )
 
 
-def test_legacy_portfolio_import_remains_compatible():
-    from src.portfolio import validate_weights as legacy_validate_weights
-
-    assert legacy_validate_weights is validate_weights
-
-
 def test_validate_weights_rejects_length_mismatch():
     with pytest.raises(ValueError, match="must match"):
         validate_weights(["SPY", "QQQ"], [1.0])

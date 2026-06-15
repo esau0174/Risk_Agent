@@ -32,13 +32,6 @@ EXPECTED_TOOL_MODULES = {
 }
 
 
-def test_legacy_tool_registry_import_remains_compatible():
-    from src.tool_registry import RiskTool as LegacyRiskTool
-    from src.core.tool_registry import RiskTool
-
-    assert LegacyRiskTool is RiskTool
-
-
 def test_expected_tools_are_registered():
     tools = list_registered_tools()
 

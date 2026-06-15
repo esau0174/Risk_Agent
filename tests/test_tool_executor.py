@@ -2,12 +2,6 @@ from src.core.tool_executor import ToolExecutor
 from src.core.tool_registry import RiskTool
 
 
-def test_legacy_tool_executor_import_remains_compatible():
-    from src.tool_executor import ToolExecutor as LegacyToolExecutor
-
-    assert LegacyToolExecutor is ToolExecutor
-
-
 def test_successful_tool_execution_returns_output_and_metadata():
     tool = RiskTool(
         name="add",

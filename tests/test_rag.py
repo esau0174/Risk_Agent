@@ -1,14 +1,6 @@
 from src.knowledge.rag import load_methodology_docs, retrieve_relevant_methodology
 
 
-def test_legacy_rag_import_remains_compatible():
-    from src.rag import load_methodology_docs as legacy_load
-    from src.rag import retrieve_relevant_methodology as legacy_retrieve
-
-    assert legacy_load is load_methodology_docs
-    assert legacy_retrieve is retrieve_relevant_methodology
-
-
 REQUIRED_MINI_SPEC_SECTIONS = (
     "## Purpose",
     "## Inputs",

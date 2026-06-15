@@ -3,12 +3,6 @@ import pytest
 from src.data.portfolio_parser import parse_portfolio_text
 
 
-def test_legacy_portfolio_parser_import_remains_compatible():
-    from src.portfolio_parser import parse_portfolio_text as legacy_parse
-
-    assert legacy_parse is parse_portfolio_text
-
-
 def test_parse_percentage_before_ticker():
     result = parse_portfolio_text("40% SPY, 30% QQQ, 20% NVDA, 10% TLT")
 

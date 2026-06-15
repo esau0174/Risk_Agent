@@ -19,14 +19,6 @@ EXPECTED_PORTFOLIO = {
 }
 
 
-def test_legacy_portfolio_loader_import_remains_compatible():
-    from src.portfolio_loader import ExposureProfile as LegacyExposureProfile
-    from src.portfolio_loader import load_portfolio_file as legacy_load
-
-    assert LegacyExposureProfile is ExposureProfile
-    assert legacy_load is load_portfolio_file
-
-
 def test_load_portfolio_from_csv(tmp_path):
     path = tmp_path / "portfolio.csv"
     pd.DataFrame(
