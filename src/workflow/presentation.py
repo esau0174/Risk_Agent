@@ -70,14 +70,14 @@ def _build_user_report(
             f"- Validation: {_validation_status(market_result)}",
             "",
             "Credit Risk / PFE",
-            f"- Peak 95% PFE: {pfe_metrics['peak_pfe_95']:,.2f}",
+            f"- Peak 95% PFE: USD {pfe_metrics['peak_pfe_95']:,.2f}",
         ]
     )
     if pfe_metrics.get("peak_pfe_99") is not None:
-        lines.append(f"- Peak 99% PFE: {pfe_metrics['peak_pfe_99']:,.2f}")
+        lines.append(f"- Peak 99% PFE: USD {pfe_metrics['peak_pfe_99']:,.2f}")
     lines.extend(
         [
-            f"- EPE: {pfe_metrics['epe']:,.2f}",
+            f"- EPE: USD {pfe_metrics['epe']:,.2f}",
             (
                 "- Largest netting set: "
                 f"{pfe_metrics['largest_netting_set_by_peak_pfe']}"

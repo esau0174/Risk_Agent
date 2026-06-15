@@ -105,7 +105,9 @@ def test_full_workflow_returns_structured_agent_run_result(monkeypatch):
     assert isinstance(result.user_report, str)
     assert "Combined Executive Summary" in result.user_report
     assert "95% historical VaR: 2.32%" in result.user_report
-    assert "Peak 95% PFE: 2,100,000.00" in result.user_report
+    assert "Peak 95% PFE: USD 2,100,000.00" in result.user_report
+    assert "Peak 99% PFE: USD 2,600,000.00" in result.user_report
+    assert "EPE: USD 1,080,000.00" in result.user_report
     assert len(result.execution_trace) == 4
     assert all(isinstance(entry, dict) for entry in result.execution_trace)
     assert {entry["workflow"] for entry in result.execution_trace} == {

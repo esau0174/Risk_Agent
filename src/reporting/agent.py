@@ -554,7 +554,7 @@ def _build_fallback_pfe_commentary(
     pfe_99_text = ""
     if pfe_result.get("peak_pfe_99") is not None:
         pfe_99_text = (
-            f" Peak 99% PFE is {pfe_result['peak_pfe_99']:,.2f} at "
+            f" Peak 99% PFE is USD {pfe_result['peak_pfe_99']:,.2f} at "
             f"{pfe_result['time_of_peak_pfe_99']:.2f} years."
         )
     references = ""
@@ -564,13 +564,13 @@ def _build_fallback_pfe_commentary(
 
     return (
         "Counterparty Exposure / PFE Analysis\n"
-        f"Peak 95% PFE is {pfe_result['peak_pfe_95']:,.2f} at "
+        f"Peak 95% PFE is USD {pfe_result['peak_pfe_95']:,.2f} at "
         f"{pfe_result['time_of_peak_pfe_95']:.2f} years."
-        f"{pfe_99_text} Average expected exposure (EPE) is "
-        f"{pfe_result['epe']:,.2f}, while maximum expected exposure is "
+        f"{pfe_99_text} Average expected exposure (EPE) is USD "
+        f"{pfe_result['epe']:,.2f}, while maximum expected exposure is USD "
         f"{pfe_result['max_expected_exposure']:,.2f}. The largest netting set by "
         f"peak PFE is {pfe_result['largest_netting_set_by_peak_pfe']} at "
-        f"{pfe_result['largest_netting_set_peak_pfe_95']:,.2f}. Assumptions and "
+        f"USD {pfe_result['largest_netting_set_peak_pfe_95']:,.2f}. Assumptions and "
         "limitations: the exposure profile is supplied or toy-mode and is not generated "
         "by a full Monte Carlo pricing engine. These deterministic summaries do not "
         "include XVA or credit model parameters. This commentary "
