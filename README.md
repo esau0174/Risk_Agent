@@ -74,7 +74,7 @@ Risk_Agent/
 |   |-- run_phase1_demo.py
 |   `-- run_text_query_demo.py
 |-- src/
-|   |-- agent.py
+|   |-- agent.py (compatibility export)
 |   |-- core/
 |   |   |-- __init__.py
 |   |   |-- risk_config.py
@@ -89,6 +89,9 @@ Risk_Agent/
 |   |   |-- portfolio.py
 |   |   |-- portfolio_loader.py
 |   |   `-- portfolio_parser.py
+|   |-- knowledge/
+|   |   |-- __init__.py
+|   |   `-- rag.py
 |   |-- market_data.py (compatibility export)
 |   |-- market_risk/
 |   |   |-- __init__.py
@@ -98,8 +101,13 @@ Risk_Agent/
 |   |-- portfolio.py (compatibility export)
 |   |-- portfolio_loader.py (compatibility export)
 |   |-- portfolio_parser.py (compatibility export)
-|   |-- rag.py
+|   |-- rag.py (compatibility export)
 |   |-- report_validator.py
+|   |-- report_generator.py (compatibility module)
+|   |-- reporting/
+|   |   |-- __init__.py
+|   |   |-- agent.py
+|   |   `-- report_generator.py
 |   |-- risk_metrics.py (compatibility export)
 |   |-- risk_report.py (compatibility export)
 |   |-- stress_testing.py (compatibility export)

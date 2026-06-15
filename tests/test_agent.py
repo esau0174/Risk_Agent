@@ -1,4 +1,20 @@
-from src.agent import _build_commentary_facts, generate_risk_commentary
+from src.reporting.agent import _build_commentary_facts, generate_risk_commentary
+
+
+def test_legacy_report_generator_module_remains_importable():
+    from src import report_generator
+    from src.reporting import report_generator as canonical_report_generator
+
+    assert report_generator.__doc__
+    assert canonical_report_generator.__name__ == "src.reporting.report_generator"
+
+
+def test_legacy_agent_import_remains_compatible():
+    from src.agent import _build_commentary_facts as legacy_build_facts
+    from src.agent import generate_risk_commentary as legacy_generate
+
+    assert legacy_build_facts is _build_commentary_facts
+    assert legacy_generate is generate_risk_commentary
 
 
 def test_build_commentary_facts_includes_largest_weight_and_composition_notes():

@@ -1,16 +1,12 @@
-"""Compatibility exports for risk commentary generation."""
+"""Risk commentary and report-generation utilities."""
 
 from src.reporting.agent import (
-    _build_commentary_facts,
-    _build_methodology_query,
     analyze_portfolio_query_with_llm,
     generate_risk_commentary,
     regenerate_risk_commentary_with_validation_errors,
 )
 
 __all__ = [
-    "_build_commentary_facts",
-    "_build_methodology_query",
     "analyze_portfolio_query_with_llm",
     "generate_risk_commentary",
     "regenerate_risk_commentary_with_validation_errors",

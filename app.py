@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from src.agent import analyze_portfolio_query_with_llm
+from src.reporting.agent import analyze_portfolio_query_with_llm
 
 
 DEFAULT_QUERY = (

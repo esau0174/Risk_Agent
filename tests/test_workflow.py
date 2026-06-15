@@ -451,7 +451,7 @@ def test_workflow_passes_stress_results_to_commentary_tool(tmp_path):
 
     def capture_commentary(*args, **kwargs):
         captured["stress_results"] = kwargs.get("stress_results")
-        from src.agent import generate_risk_commentary
+        from src.reporting.agent import generate_risk_commentary
 
         return generate_risk_commentary(*args, **kwargs)
 

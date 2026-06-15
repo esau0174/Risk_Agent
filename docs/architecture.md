@@ -85,10 +85,16 @@ Data input and portfolio utilities live in `src/data/`:
 
 The original root-level data module paths remain as lightweight compatibility exports.
 
-Other shared application modules currently remain directly under `src/`:
+Knowledge retrieval lives in `src/knowledge/`:
 
 - `rag.py` loads and ranks local methodology documents.
+
+Commentary and reporting utilities live in `src/reporting/`:
+
 - `agent.py` builds prompts and produces LLM or deterministic fallback commentary.
+- `report_generator.py` currently remains an empty placeholder module.
+
+The original `src/rag.py`, `src/agent.py`, and `src/report_generator.py` paths remain as lightweight compatibility modules.
 
 The registry includes input adapters, market and credit calculations, methodology retrieval, commentary generation/regeneration, and report validation. It is an in-process Python registry, not a remote tool protocol or OpenAI tool-calling implementation.
 
@@ -117,13 +123,13 @@ The module consumes supplied profile data; it does not generate exposures from t
 
 ## Methodology Retrieval
 
-`rag.py` loads Markdown notes from `docs/` and applies deterministic keyword scoring. Market workflows build a query from the user instruction and calculated report. PFE workflows restrict retrieval to counterparty-relevant note titles and use PFE, EPE, exposure-profile, and netting-set terms.
+`src/knowledge/rag.py` loads Markdown notes from `docs/` and applies deterministic keyword scoring. Market workflows build a query from the user instruction and calculated report. PFE workflows restrict retrieval to counterparty-relevant note titles and use PFE, EPE, exposure-profile, and netting-set terms.
 
 The current retrieval layer uses no embeddings, vector database, external web source, or learned reranker. Retrieved note titles and content are passed to commentary generation and later checked by methodology-grounding validation.
 
 ## Commentary Generation
 
-`agent.py` generates analyst-style commentary from calculated outputs, portfolio composition, stress results, PFE results, and retrieved methodology notes. When LLM use is disabled, deterministic fallback commentary supports offline execution and tests.
+`src/reporting/agent.py` generates analyst-style commentary from calculated outputs, portfolio composition, stress results, PFE results, and retrieved methodology notes. When LLM use is disabled, deterministic fallback commentary supports offline execution and tests.
 
 The prompt instructs the model to use only supplied calculations, avoid invented figures and recommendations, state assumptions and limitations, and include an investment-advice disclaimer. If report validation fails, the workflow can invoke a registered regeneration tool once with the validation findings.
 
