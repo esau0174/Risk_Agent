@@ -36,7 +36,7 @@ def validate_generated_report(
         percentage_tolerance,
         enabled=pfe_result is None,
     )
-    validate_pfe_result_consistency(checks, errors, commentary_text, pfe_result)
+    validate_pfe_result_consistency(checks, errors, warnings, commentary_text, pfe_result)
     validate_stress_result_consistency(
         checks,
         errors,

@@ -34,6 +34,29 @@ def test_calculate_pfe_metrics_returns_all_profile_metrics():
     }
     assert metrics["largest_netting_set_by_peak_pfe"] == "NS-001"
     assert metrics["largest_netting_set_peak_pfe_95"] == 220.0
+    assert metrics["configured_limit"] is None
+    assert metrics["limit_utilization"] is None
+    assert metrics["limit_status"] == "WARNING"
+    assert metrics["limit_warning"] == "No credit limit configured for netting set NS-001."
+
+
+def test_calculate_pfe_metrics_returns_limit_utilization_for_largest_netting_set():
+    metrics = calculate_pfe_metrics(
+        _exposure_profile(),
+        credit_limits={"NS-001": 275.0, "NS-002": 100.0},
+    )
+
+    assert metrics["configured_limit"] == 275.0
+    assert metrics["limit_utilization"] == pytest.approx(0.8)
+    assert metrics["limit_status"] == "PASSED"
+    assert metrics["limit_warning"] is None
+
+
+def test_calculate_pfe_metrics_marks_limit_breach():
+    metrics = calculate_pfe_metrics(_exposure_profile(), credit_limits={"NS-001": 200.0})
+
+    assert metrics["limit_utilization"] == pytest.approx(1.1)
+    assert metrics["limit_status"] == "BREACHED"
 
 
 def test_calculate_pfe_metrics_omits_unavailable_pfe_99_values():

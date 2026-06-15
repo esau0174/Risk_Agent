@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Mapping
 
 from src.data.portfolio_loader import ExposureProfile, ExposureProfileRow
 
 
-def calculate_pfe_metrics(exposure_profile: ExposureProfile) -> dict:
+def calculate_pfe_metrics(
+    exposure_profile: ExposureProfile,
+    credit_limits: Mapping[str, float] | None = None,
+) -> dict:
     """Calculate deterministic exposure and PFE profile summary metrics."""
     if not isinstance(exposure_profile, ExposureProfile):
         raise ValueError("exposure_profile must be an ExposureProfile object.")
@@ -38,6 +42,12 @@ def calculate_pfe_metrics(exposure_profile: ExposureProfile) -> dict:
         key=peak_pfe_95_by_netting_set.get,
     )
     expected_exposures = [row.expected_exposure for row in exposures]
+    largest_netting_set_peak = float(peak_pfe_95_by_netting_set[largest_netting_set])
+    limit_fields = _calculate_limit_fields(
+        largest_netting_set,
+        largest_netting_set_peak,
+        credit_limits or {},
+    )
 
     return {
         "peak_pfe_95": float(peak_95_row.pfe_95),
@@ -58,12 +68,38 @@ def calculate_pfe_metrics(exposure_profile: ExposureProfile) -> dict:
             for netting_set, total in total_expected_exposure_by_netting_set.items()
         },
         "largest_netting_set_by_peak_pfe": largest_netting_set,
-        "largest_netting_set_peak_pfe_95": float(
-            peak_pfe_95_by_netting_set[largest_netting_set]
-        ),
+        "largest_netting_set_peak_pfe_95": largest_netting_set_peak,
+        **limit_fields,
     }
 
 
 def _validate_row(row: ExposureProfileRow) -> None:
     if not isinstance(row, ExposureProfileRow):
         raise ValueError("Exposure profile rows must be ExposureProfileRow objects.")
+
+
+def _calculate_limit_fields(
+    netting_set: str,
+    peak_pfe_95: float,
+    credit_limits: Mapping[str, float],
+) -> dict:
+    configured_limit = credit_limits.get(netting_set)
+    if configured_limit is None:
+        return {
+            "configured_limit": None,
+            "limit_utilization": None,
+            "limit_status": "WARNING",
+            "limit_warning": f"No credit limit configured for netting set {netting_set}.",
+        }
+
+    limit = float(configured_limit)
+    if limit <= 0:
+        raise ValueError(f"Credit limit for netting set {netting_set} must be positive.")
+
+    utilization = peak_pfe_95 / limit
+    return {
+        "configured_limit": limit,
+        "limit_utilization": float(utilization),
+        "limit_status": "BREACHED" if utilization > 1 else "PASSED",
+        "limit_warning": None,
+    }

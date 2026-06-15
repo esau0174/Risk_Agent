@@ -8,6 +8,7 @@ from src.validators.common import ValidationCheck, get_value
 def validate_pfe_result_consistency(
     checks: list[ValidationCheck],
     errors: list[str],
+    warnings: list[str],
     commentary: str,
     pfe_result,
 ) -> None:
@@ -31,6 +32,7 @@ def validate_pfe_result_consistency(
         )
     )
     errors.extend(pfe_errors)
+    _validate_credit_limit_utilization(checks, errors, warnings, pfe_result)
 
 
 def _pfe_result_consistency_errors(
@@ -103,3 +105,52 @@ def _pfe_result_consistency_errors(
 
 def _number_from_match(match: re.Match, group: str) -> float:
     return float(match.group(group).replace(",", ""))
+
+
+def _validate_credit_limit_utilization(
+    checks: list[ValidationCheck],
+    errors: list[str],
+    warnings: list[str],
+    pfe_result,
+) -> None:
+    configured_limit = get_value(pfe_result, "configured_limit")
+    utilization = get_value(pfe_result, "limit_utilization")
+    status = get_value(pfe_result, "limit_status")
+    limit_warning = get_value(pfe_result, "limit_warning")
+
+    if configured_limit is None:
+        message = limit_warning or "No credit limit configured for largest netting set."
+        checks.append(
+            ValidationCheck(
+                name="credit_limit_utilization",
+                passed=False,
+                message=message,
+            )
+        )
+        warnings.append(message)
+        return
+
+    limit_errors = []
+    if utilization is None:
+        limit_errors.append("Limit utilization is missing despite configured limit.")
+    elif float(utilization) < 0:
+        limit_errors.append("Limit utilization must be non-negative.")
+
+    expected_status = "BREACHED" if utilization is not None and float(utilization) > 1 else "PASSED"
+    if status != expected_status:
+        limit_errors.append(
+            f"Limit status mismatch: expected {expected_status}, found {status}."
+        )
+
+    checks.append(
+        ValidationCheck(
+            name="credit_limit_utilization",
+            passed=not limit_errors,
+            message=(
+                "Credit limit utilization is consistent with configured limit."
+                if not limit_errors
+                else "Credit limit utilization is inconsistent with configured limit."
+            ),
+        )
+    )
+    errors.extend(limit_errors)

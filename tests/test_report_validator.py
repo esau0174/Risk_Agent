@@ -66,6 +66,10 @@ def _pfe_result() -> dict:
         "max_expected_exposure": 1_400_000.0,
         "largest_netting_set_by_peak_pfe": "NS-001",
         "largest_netting_set_peak_pfe_95": 2_100_000.0,
+        "configured_limit": 2_500_000.0,
+        "limit_utilization": 0.84,
+        "limit_status": "PASSED",
+        "limit_warning": None,
     }
 
 
@@ -540,6 +544,10 @@ def test_matching_pfe_commentary_passes_consistency_validation():
         check.name == "pfe_result_consistency" and check.passed
         for check in result.checks
     )
+    assert any(
+        check.name == "credit_limit_utilization" and check.passed
+        for check in result.checks
+    )
     assert not any(
         check.name == "commentary_metric_consistency" for check in result.checks
     )
@@ -579,3 +587,72 @@ def test_mismatched_pfe_commentary_fails(commentary, expected_error):
 
     assert result.passed is False
     assert expected_error in result.errors
+
+
+def test_missing_credit_limit_produces_validation_warning():
+    pfe_result = _pfe_result()
+    pfe_result["configured_limit"] = None
+    pfe_result["limit_utilization"] = None
+    pfe_result["limit_status"] = "WARNING"
+    pfe_result["limit_warning"] = "No credit limit configured for netting set NS-001."
+
+    result = validate_generated_report(
+        None,
+        None,
+        [],
+        (
+            "Counterparty Exposure / PFE Analysis: Peak 95% PFE is 2,100,000.00 "
+            "at 1.00 years. EPE is 1,080,000.00. Assumptions and limitations apply; "
+            "not investment advice."
+        ),
+        pfe_result=pfe_result,
+    )
+
+    assert result.passed is True
+    assert result.warnings == ["No credit limit configured for netting set NS-001."]
+    assert any(
+        check.name == "credit_limit_utilization" and not check.passed
+        for check in result.checks
+    )
+
+
+def test_negative_credit_limit_utilization_fails_validation():
+    pfe_result = _pfe_result()
+    pfe_result["limit_utilization"] = -0.1
+
+    result = validate_generated_report(
+        None,
+        None,
+        [],
+        (
+            "Counterparty Exposure / PFE Analysis: Peak 95% PFE is 2,100,000.00 "
+            "at 1.00 years. EPE is 1,080,000.00. Assumptions and limitations apply; "
+            "not investment advice."
+        ),
+        pfe_result=pfe_result,
+    )
+
+    assert result.passed is False
+    assert "Limit utilization must be non-negative." in result.errors
+
+
+def test_breached_credit_limit_requires_breached_status():
+    pfe_result = _pfe_result()
+    pfe_result["configured_limit"] = 2_000_000.0
+    pfe_result["limit_utilization"] = 1.05
+    pfe_result["limit_status"] = "PASSED"
+
+    result = validate_generated_report(
+        None,
+        None,
+        [],
+        (
+            "Counterparty Exposure / PFE Analysis: Peak 95% PFE is 2,100,000.00 "
+            "at 1.00 years. EPE is 1,080,000.00. Assumptions and limitations apply; "
+            "not investment advice."
+        ),
+        pfe_result=pfe_result,
+    )
+
+    assert result.passed is False
+    assert "Limit status mismatch: expected BREACHED, found PASSED." in result.errors

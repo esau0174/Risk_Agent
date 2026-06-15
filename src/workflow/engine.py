@@ -366,6 +366,7 @@ def _run_exposure_profile_workflow(
             f"{output['epe']:.2f}."
         ),
         exposure_profile,
+        credit_limits=risk_config.credit_limits,
     )
     complete_step(
         plan,

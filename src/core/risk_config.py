@@ -71,6 +71,7 @@ class RiskConfig:
     risk_metrics: RiskMetricsConfig = field(default_factory=RiskMetricsConfig)
     reporting: ReportingConfig = field(default_factory=ReportingConfig)
     stress_scenarios: tuple[StressScenario, ...] = ()
+    credit_limits: dict[str, float] = field(default_factory=dict)
 
 
 def load_risk_config(config_file: str | None = None) -> RiskConfig:
@@ -96,6 +97,7 @@ def load_risk_config(config_file: str | None = None) -> RiskConfig:
     risk_metrics = _config_section(payload, "risk_metrics")
     reporting = _config_section(payload, "reporting")
     stress_scenarios = parse_stress_scenarios(payload.get("stress_scenarios", []))
+    credit_limits = _parse_credit_limits(payload.get("credit_limits", {}))
 
     enabled_value = risk_metrics.get("enabled")
     if enabled_value is None:
@@ -145,6 +147,7 @@ def load_risk_config(config_file: str | None = None) -> RiskConfig:
             ),
         ),
         stress_scenarios=stress_scenarios,
+        credit_limits=credit_limits,
     )
     _validate_config(config)
     return config
@@ -257,6 +260,28 @@ def parse_stress_scenarios(value) -> tuple[StressScenario, ...]:
         )
 
     return tuple(scenarios)
+
+
+def _parse_credit_limits(value) -> dict[str, float]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError("credit_limits must be an object mapping netting sets to limits.")
+
+    limits = {}
+    for netting_set, limit in value.items():
+        key = str(netting_set).strip()
+        if not key:
+            raise ValueError("credit_limits netting set names must be non-empty.")
+        limits[key] = _bounded_number(
+            limit,
+            f"credit_limits.{key}",
+            minimum=0.0,
+            maximum=math.inf,
+        )
+        if limits[key] == 0:
+            raise ValueError(f"credit_limits.{key} must be greater than 0.")
+    return limits
 
 
 def _confidence_level(value) -> float:

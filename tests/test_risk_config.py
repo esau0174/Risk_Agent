@@ -18,6 +18,7 @@ def test_load_default_risk_config():
     assert config.var.method == "historical"
     assert "historical_var" in config.risk_metrics.enabled
     assert config.reporting.validate_commentary is True
+    assert config.credit_limits == {}
 
 
 def test_load_json_risk_config(tmp_path):
@@ -42,6 +43,10 @@ def test_load_json_risk_config(tmp_path):
                     "include_llm_commentary": False,
                     "validate_commentary": False,
                 },
+                "credit_limits": {
+                    "NS-001": 2_500_000,
+                    "NS-002": 1_000_000,
+                },
             }
         ),
         encoding="utf-8",
@@ -59,6 +64,15 @@ def test_load_json_risk_config(tmp_path):
         "max_drawdown",
     )
     assert config.reporting.include_methodology_notes is False
+    assert config.credit_limits == {"NS-001": 2_500_000.0, "NS-002": 1_000_000.0}
+
+
+def test_invalid_credit_limits_are_rejected(tmp_path):
+    path = tmp_path / "risk_config.json"
+    path.write_text('{"credit_limits": {"NS-001": 0}}', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="credit_limits.NS-001 must be greater than 0"):
+        load_risk_config(str(path))
 
 
 def test_invalid_confidence_level_is_rejected(tmp_path):

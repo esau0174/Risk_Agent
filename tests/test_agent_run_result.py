@@ -77,6 +77,9 @@ def _workflow_result(route: str) -> WorkflowResult:
                 "peak_pfe_99": 2_600_000.0,
                 "epe": 1_080_000.0,
                 "largest_netting_set_by_peak_pfe": "NS-001",
+                "configured_limit": 2_500_000.0,
+                "limit_utilization": 0.84,
+                "limit_status": "PASSED",
             }
         ),
         stress_test_results=(
@@ -108,6 +111,8 @@ def test_full_workflow_returns_structured_agent_run_result(monkeypatch):
     assert "Peak 95% PFE: USD 2,100,000.00" in result.user_report
     assert "Peak 99% PFE: USD 2,600,000.00" in result.user_report
     assert "EPE: USD 1,080,000.00" in result.user_report
+    assert "Limit utilization: 84.00% of USD 2,500,000.00" in result.user_report
+    assert "Limit status: PASSED" in result.user_report
     assert len(result.execution_trace) == 4
     assert all(isinstance(entry, dict) for entry in result.execution_trace)
     assert {entry["workflow"] for entry in result.execution_trace} == {

@@ -32,5 +32,9 @@
       "tech_selloff_pct": 0.25,
       "rates_shock_bps": 100
     }
-  ]
+  ],
+  "credit_limits": {
+    "NS-001": 2500000,
+    "NS-002": 1000000
+  }
 }
