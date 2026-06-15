@@ -146,6 +146,13 @@ Requires Python 3.10+.
 pip install -r requirements.txt
 ```
 
+Optional editable installation for local development:
+
+```bash
+pip install -e ".[dev]"
+pytest -q
+```
+
 For LLM commentary, create a local `.env` file:
 
 ```text
