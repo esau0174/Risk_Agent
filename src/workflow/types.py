@@ -14,6 +14,21 @@ class AgentRunResult:
 
 
 @dataclass
+class AgentWorkflowResult:
+    query: str
+    scenario: str
+    detected_modules: list[str]
+    proposed_plan: "WorkflowPlan"
+    plan_validation_result: object
+    approved_plan: "WorkflowPlan | None"
+    user_report: str | None
+    final_report_summary: str
+    execution_trace: list[dict]
+    validation_result: object | None
+    raw_outputs: dict
+
+
+@dataclass
 class WorkflowStep:
     name: str
     description: str

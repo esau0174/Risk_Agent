@@ -1,4 +1,5 @@
 from src.workflow.engine import run_risk_workflow
+from src.workflow.agent import AGENT_SCENARIOS, AgentScenarioConfig, run_agent_workflow
 from src.workflow.autonomous_planner import propose_autonomous_workflow_plan
 from src.workflow.plan_validator import PlanValidationResult, validate_workflow_plan
 from src.workflow.presentation import run_full_risk_agent_workflow
@@ -11,6 +12,7 @@ from src.workflow.planner import (
 )
 from src.workflow.types import (
     AgentRunResult,
+    AgentWorkflowResult,
     ExecutionTraceEntry,
     WorkflowPlan,
     WorkflowResult,
@@ -19,6 +21,9 @@ from src.workflow.types import (
 
 __all__ = [
     "AgentRunResult",
+    "AgentWorkflowResult",
+    "AGENT_SCENARIOS",
+    "AgentScenarioConfig",
     "ExecutionTraceEntry",
     "Intent",
     "WorkflowPlan",
@@ -32,5 +37,6 @@ __all__ = [
     "propose_autonomous_workflow_plan",
     "run_risk_workflow",
     "run_full_risk_agent_workflow",
+    "run_agent_workflow",
     "validate_workflow_plan",
 ]

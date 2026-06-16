@@ -24,6 +24,8 @@ Each capability is registered as a named tool. Planned steps and actual tool cal
 
 Planning is deterministic. The current workflow does not use an LLM to choose tools or dynamically create execution paths.
 
+The recommended project entry point is `examples/run_autonomous_planning_demo.py`. It proposes a workflow from the user query, available schemas, requested modules, and registered tool names, then validates the proposed tool sequence before delegating to the deterministic execution path. The deterministic full demo remains available as a baseline and regression demo.
+
 ## Input Model
 
 The primary entry point is `run_risk_workflow()` from `src.workflow`. It accepts:
@@ -171,7 +173,7 @@ Validation preserves deterministic check ordering and returns structured checks,
 
 ## Presentation And Trace Serialization
 
-`src/workflow/presentation.py` converts the market and credit `WorkflowResult` objects into an `AgentRunResult`. The full demo prints only `user_report` by default. Passing `--trace-file` to `examples/run_full_risk_agent_demo.py` writes the internal `execution_trace` to `logs/full_demo_trace.json`, or to a supplied path.
+`src/workflow/presentation.py` converts the market and credit `WorkflowResult` objects into an `AgentRunResult`. The autonomous planning demo is the primary user-facing entry point and supports `--scenario full|market|credit|regulatory`, `--query`, and `--show-plan`. The deterministic full demo prints only `user_report` by default. Passing `--trace-file` to `examples/run_full_risk_agent_demo.py` writes the internal `execution_trace` to `logs/full_demo_trace.json`, or to a supplied path.
 
 Failure behavior is demonstrated separately under `examples/failure_cases/`:
 

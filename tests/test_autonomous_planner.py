@@ -3,13 +3,18 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 from src.workflow import (
+    AgentWorkflowResult,
+    AGENT_SCENARIOS,
     WorkflowPlan,
     WorkflowStep,
     propose_autonomous_workflow_plan,
+    run_agent_workflow,
     validate_workflow_plan,
 )
+import src.workflow.agent as agent_module
 
 
 def test_autonomous_planner_proposes_all_requested_risk_modules():
@@ -110,6 +115,128 @@ def test_plan_validator_rejects_misordered_tools():
     )
 
 
+def test_run_agent_workflow_full_scenario(monkeypatch):
+    monkeypatch.setattr(
+        agent_module,
+        "run_full_risk_agent_workflow",
+        lambda *args, **kwargs: SimpleNamespace(
+            user_report="Combined Executive Summary\nMarket Risk\nCredit Risk",
+            execution_trace=[
+                {
+                    "step_number": 1,
+                    "tool_name": "calculate_risk_metrics",
+                    "status": "success",
+                }
+            ],
+            validation_result={"passed": True},
+            raw_outputs={"market_risk": {}, "credit_risk": {}, "regulatory_risk": {}},
+        ),
+    )
+
+    result = run_agent_workflow(scenario="full")
+
+    assert isinstance(result, AgentWorkflowResult)
+    assert result.scenario == "full"
+    assert result.detected_modules == ["Market Risk", "Credit Risk", "Regulatory Risk"]
+    assert result.plan_validation_result.passed is True
+    assert result.approved_plan is not None
+    assert "Combined Executive Summary" in result.user_report
+    assert result.execution_trace[0]["tool_name"] == "calculate_risk_metrics"
+    assert result.validation_result == {"passed": True}
+    assert "market_risk" in result.raw_outputs
+
+
+def test_run_agent_workflow_market_only_scenario(monkeypatch):
+    monkeypatch.setattr(
+        agent_module,
+        "run_risk_workflow",
+        lambda *args, **kwargs: SimpleNamespace(
+            execution_trace=[
+                SimpleNamespace(
+                    step_number=1,
+                    tool_name="calculate_risk_metrics",
+                    status="success",
+                    input_summary="Market inputs.",
+                    output_summary="Market metrics.",
+                    error=None,
+                )
+            ],
+            validation_result=SimpleNamespace(passed=True),
+        ),
+    )
+
+    result = run_agent_workflow(scenario="market")
+
+    assert result.detected_modules == ["Market Risk"]
+    assert "Market Risk" in result.final_report_summary
+    assert result.execution_trace[0]["tool_name"] == "calculate_risk_metrics"
+    assert "market_risk" in result.raw_outputs
+
+
+def test_run_agent_workflow_credit_only_scenario(monkeypatch):
+    monkeypatch.setattr(
+        agent_module,
+        "run_risk_workflow",
+        lambda *args, **kwargs: SimpleNamespace(
+            execution_trace=[
+                SimpleNamespace(
+                    step_number=1,
+                    tool_name="calculate_pfe_metrics",
+                    status="success",
+                    input_summary="Credit inputs.",
+                    output_summary="PFE metrics.",
+                    error=None,
+                )
+            ],
+            validation_result=SimpleNamespace(passed=True),
+        ),
+    )
+
+    result = run_agent_workflow(scenario="credit")
+
+    assert result.detected_modules == ["Credit Risk"]
+    assert "Credit Risk" in result.final_report_summary
+    assert result.execution_trace[0]["tool_name"] == "calculate_pfe_metrics"
+    assert "credit_risk" in result.raw_outputs
+
+
+def test_run_agent_workflow_regulatory_only_scenario():
+    result = run_agent_workflow(scenario="regulatory")
+
+    assert result.detected_modules == ["Regulatory Risk"]
+    assert "Regulatory Risk" in result.final_report_summary
+    assert result.execution_trace[0]["tool_name"] == "assess_regulatory_readiness"
+    assert result.validation_result.passed is True
+    assert "regulatory_risk" in result.raw_outputs
+
+
+def test_run_agent_workflow_invalid_plan_does_not_execute(monkeypatch):
+    def fail_if_executed(*args, **kwargs):
+        raise AssertionError("Execution should not start for an invalid plan.")
+
+    monkeypatch.setattr(agent_module, "run_full_risk_agent_workflow", fail_if_executed)
+    monkeypatch.setattr(agent_module, "run_risk_workflow", fail_if_executed)
+    invalid_plan = WorkflowPlan(
+        objective="Invalid autonomous plan.",
+        steps=[
+            WorkflowStep(
+                name="calculate_sa_ccr_capital",
+                description="Unsupported capital calculation.",
+                status="proposed",
+                tool_name="calculate_sa_ccr_capital",
+            )
+        ],
+    )
+
+    result = run_agent_workflow(scenario="full", proposed_plan=invalid_plan)
+
+    assert result.plan_validation_result.passed is False
+    assert result.approved_plan is None
+    assert result.execution_trace == []
+    assert result.raw_outputs == {}
+    assert result.final_report_summary == "Approved Plan: none; execution was not started."
+
+
 def _load_demo_module():
     demo_path = Path("examples/run_autonomous_planning_demo.py")
     spec = importlib.util.spec_from_file_location("run_autonomous_planning_demo", demo_path)
@@ -121,11 +248,7 @@ def _load_demo_module():
 
 def test_autonomous_demo_scenarios_detect_distinct_modules(monkeypatch, capsys):
     module = _load_demo_module()
-    monkeypatch.setattr(
-        module,
-        "_print_execution_summary",
-        lambda scenario: print(f"- Final report sections: {scenario}"),
-    )
+    monkeypatch.setattr(module, "run_agent_workflow", _fake_run_agent_workflow)
 
     expected_modules = {
         "market": "Detected modules: Market Risk",
@@ -143,11 +266,7 @@ def test_autonomous_demo_scenarios_detect_distinct_modules(monkeypatch, capsys):
 
 def test_autonomous_demo_custom_query_and_show_plan(monkeypatch, capsys):
     module = _load_demo_module()
-    monkeypatch.setattr(
-        module,
-        "_print_execution_summary",
-        lambda scenario: print(f"- Final report sections: {scenario}"),
-    )
+    monkeypatch.setattr(module, "run_agent_workflow", _fake_run_agent_workflow)
 
     module.main(
         [
@@ -170,14 +289,34 @@ def test_autonomous_demo_full_plan_displays_credit_exposure_loading(
     capsys,
 ):
     module = _load_demo_module()
-    monkeypatch.setattr(
-        module,
-        "_print_execution_summary",
-        lambda scenario: print(f"- Final report sections: {scenario}"),
-    )
+    monkeypatch.setattr(module, "run_agent_workflow", _fake_run_agent_workflow)
 
     module.main(["--scenario", "full", "--show-plan"])
 
     output = capsys.readouterr().out
     assert "load_exposure_profile - Load counterparty exposure profile" in output
     assert output.index("load_exposure_profile") < output.index("calculate_pfe_metrics")
+
+
+def _fake_run_agent_workflow(query=None, scenario="full", proposed_plan=None):
+    scenario_config = AGENT_SCENARIOS[scenario]
+    effective_query = query or scenario_config.query
+    plan = proposed_plan or propose_autonomous_workflow_plan(
+        effective_query,
+        available_input_schemas=scenario_config.available_input_schemas,
+        requested_modules=scenario_config.requested_modules,
+    )
+    validation_result = validate_workflow_plan(plan)
+    return AgentWorkflowResult(
+        query=effective_query,
+        scenario=scenario,
+        detected_modules=scenario_config.requested_modules,
+        proposed_plan=plan,
+        plan_validation_result=validation_result,
+        approved_plan=plan if validation_result.passed else None,
+        user_report="Fake user report.",
+        final_report_summary=f"- Final report sections: {scenario}",
+        execution_trace=[{"step_number": 1, "tool_name": "fake_tool"}],
+        validation_result={"passed": validation_result.passed},
+        raw_outputs={},
+    )
