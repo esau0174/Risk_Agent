@@ -1,176 +1,134 @@
 # RiskFlow Agent
 
-RiskFlow Agent is an agentic financial risk workflow demo built around deterministic Python analytics. It combines LLM-assisted workflow planning, registered tool execution, runtime tracing, local methodology retrieval, LLM or deterministic commentary, and validation gates.
-
-The project supports market-risk, counterparty-exposure, and regulatory-readiness workflows through one orchestration and presentation layer. LLMs may propose plans and write commentary, but deterministic Python tools calculate risk metrics and validators approve execution and output.
+Controlled LLM-assisted risk workflow agent for Market Risk, Credit Risk / PFE, and regulatory-readiness analysis.
 
 **LLM plans. Python tools calculate. Validators gate execution and output.**
 
-This is an engineering and analytics demonstration, not a production risk platform or investment advisory system.
+RiskFlow Agent is an interview-grade AI + Finance engineering demo. It shows how a natural-language request can be converted into an auditable, validated risk workflow without allowing an LLM to invent metrics, execute arbitrary tools, or fabricate regulatory capital numbers.
 
-## Why It Is Agentic
+## Why This Is An Agent
 
-RiskFlow Agent does more than call an LLM from a script. The workflow makes planning and execution explicit:
+This project is not just a portfolio VaR script wrapped in a chatbot. It separates planning, execution, analytics, reporting, and validation:
 
-- The primary planner can use an LLM to propose a workflow from the user request, available schemas, and registered tools.
-- A deterministic rule planner remains available as fallback/offline mode.
-- A tool registry exposes named shared, market-risk, and credit-risk capabilities.
-- `ToolExecutor` invokes registered handlers and returns structured results.
-- An execution trace records actual tool calls, statuses, inputs, outputs, and errors.
-- Data schema detection routes market portfolios and exposure profiles through different analytical paths.
-- Commentary is grounded in calculated results and retrieved methodology.
-- A deterministic plan validator must approve proposed tool sequences before execution.
-- A report validation gate checks numerical consistency and policy guardrails, with one controlled commentary retry when required.
+- The planner proposes a workflow from the user query, input context, and registered tools.
+- The plan validator rejects unknown tools, unsupported regulatory capital/margin tools, and misordered workflows.
+- The tool registry exposes explicit deterministic capabilities for shared infrastructure, market risk, credit risk, and regulatory readiness.
+- The executor runs only approved registered tools.
+- Risk metrics are calculated by Python modules, not by the LLM.
+- Commentary is grounded in calculated outputs and local methodology notes.
+- Report validators check numerical consistency, guardrails, and unsupported advice.
+- Execution trace and raw outputs remain available for audit.
 
-The LLM planner cannot execute tools, calculate VaR, ES, PFE, SA-CCR, SIMM, RegIM, capital, margin, or bypass validation. Unsupported or misordered tool plans are rejected before execution.
-
-## Supported Workflows
-
-### Market Risk
-
-The market-risk path accepts ticker weights, loads historical market data, calculates portfolio returns, and produces:
-
-- Annualized volatility
-- Historical Value at Risk (VaR)
-- Expected Shortfall (ES)
-- Maximum drawdown
-- Correlation matrix support in the calculation layer
-- Largest-weight and ticker-composition concentration analysis
-- Optional deterministic equity, technology, and rates stress scenarios
-
-VaR, ES, and drawdown are reported as positive loss magnitudes.
-
-### Credit Risk
-
-The credit-risk path accepts a supplied counterparty exposure profile and calculates:
-
-- Peak PFE at 95%
-- Peak PFE at 99%, when available
-- Time of peak PFE
-- Average Expected Exposure / EPE
-- Maximum expected exposure
-- Expected exposure by netting set
-- Largest netting set by peak PFE
-- Optional limit utilization for the largest netting set when credit limits are configured
-
-This path summarizes supplied exposure profiles. It does not generate exposures through a pricing or Monte Carlo engine.
-When `credit_limits` are supplied by netting set, utilization is calculated as Peak 95% PFE divided by the configured limit. Limit status values are `PASSED`, `WARNING`, or `BREACHED`.
-
-### Regulatory Risk
-
-The regulatory-risk path is a readiness screen, not a capital calculator. It checks whether available inputs are sufficient for downstream SA-CCR and SIMM / RegIM workflows, reports missing fields, and explicitly avoids generating regulatory capital or margin numbers when inputs are insufficient.
-
-## Input Model
-
-The shared entry point is `run_risk_workflow()` from `src.workflow`:
-
-- `query`: natural-language analysis instruction.
-- `data_file`: optional CSV, XLSX, or JSON holdings or exposure-profile file.
-- `config_file`: optional JSON calculation and reporting configuration.
-
-Without `data_file`, the market portfolio can be parsed from the query. The legacy `portfolio_file` parameter remains available as a backward-compatible alias.
-
-Supported file schemas:
+## Architecture Overview
 
 ```text
-Market portfolio: ticker, weight
-Exposure profile: netting_set, time_years, expected_exposure, pfe_95
-Optional exposure fields: pfe_99, currency, counterparty
+User query + input context
+        |
+        v
+LLM planner or rule fallback planner
+        |
+        v
+Deterministic plan validator
+        |
+        v
+Tool registry -> ToolExecutor
+        |
+        v
+Deterministic risk tools
+        |
+        v
+Methodology retrieval
+        |
+        v
+Commentary generation
+        |
+        v
+Report validation / guardrails
+        |
+        v
+User report + execution trace + validation result + raw outputs
 ```
 
-## Architecture
+Canonical package structure:
 
-```text
-query + data_file + config_file
-              |
-              v
- LLM or rule-based workflow plan
-              |
-              v
- deterministic plan validation
-              |
-              v
-     registered tool execution
-              |
-       +------+------+------+
-       |             |      |
-       v             v      v
- market risk   credit risk regulatory
- analytics     exposure    readiness
-               analytics
-       |             |      |
-       +------+------+------+
-              v
-   local methodology retrieval
-              v
- LLM or deterministic commentary
-              v
- validation and guardrail checks
-              v
- structured AgentRunResult
-  |       |       |       |
- report  trace  validation raw outputs
-```
-
-Canonical source packages:
-
-- `src/core/`: tool registry, tool executor, and risk configuration.
-- `src/data/`: file loading, natural-language portfolio parsing, portfolio calculations, and market data.
-- `src/workflow/`: planner, engine, execution helpers, trace handling, and result types.
-- `src/validators/`: market, stress, PFE, methodology, and commentary validation.
-- `src/market_risk/`: market metrics, report assembly, and stress testing.
-- `src/credit_risk/`: counterparty exposure and PFE analytics.
+- `src/core/`: tool registry, tool executor, risk configuration.
+- `src/data/`: portfolio parsing, file loading, portfolio utilities, market data.
+- `src/workflow/`: LLM planner, rule fallback planner, plan validator, engine, presentation types.
+- `src/market_risk/`: volatility, historical VaR, Expected Shortfall, drawdown, stress testing.
+- `src/credit_risk/`: counterparty exposure profile and PFE analytics.
 - `src/regulatory_risk/`: SA-CCR and SIMM / RegIM readiness screening.
 - `src/knowledge/`: local methodology retrieval.
 - `src/reporting/`: commentary generation and report formatting utilities.
+- `src/validators/`: market, stress, credit/PFE, regulatory, methodology, and guardrail checks.
 
-Canonical imports use the package paths above. See [docs/architecture.md](docs/architecture.md) for implementation details.
+See [docs/architecture.md](docs/architecture.md) for the detailed implementation architecture.
 
-## Structured Agent Output
+## What The Demo Supports
 
-The combined workflow returns an `AgentRunResult` that separates presentation from internal execution details:
+**Market Risk**
 
-- `user_report`: clean user-facing market-risk, credit-risk, and regulatory-readiness summary.
-- `execution_trace`: auditable workflow and tool execution records.
-- `validation_result`: structured guardrail checks, errors, and warnings.
-- `raw_outputs`: underlying market-risk and credit-risk analytics outputs.
+- Annualized volatility
+- Historical VaR
+- Expected Shortfall
+- Maximum drawdown
+- Deterministic stress scenario loss
+- Concentration observations from weights and ticker composition
 
-The main demo prints only `user_report` by default. Internal trace data can be serialized separately for inspection without cluttering the user-facing report.
+**Credit Risk / PFE**
 
-## Validation And Guardrails
+- Exposure profile validation
+- Peak PFE
+- EPE / average expected exposure
+- Netting set concentration
+- Optional limit utilization against configured netting-set limits
 
-Generated reports pass through deterministic validation covering:
+**Regulatory Readiness**
 
-- Portfolio weight consistency
-- Positive-loss VaR, ES, and drawdown conventions
-- Expected Shortfall greater than or equal to VaR
-- Commentary percentages versus calculated market metrics
-- Stress loss, stressed value, and contribution consistency
-- PFE, peak-time, and EPE consistency
-- Credit limit utilization status for configured netting-set limits
-- Regulatory readiness missing-input reporting and no fabricated capital or margin numbers
-- Citations limited to retrieved methodology notes
-- Direct trade recommendations and guaranteed-outcome language
-- Presence of assumptions or limitations
+- SA-CCR readiness screening
+- SIMM / RegIM readiness screening
+- Missing-input reporting
+- Explicit guardrail that no regulatory capital or margin number is generated from insufficient inputs
 
-If commentary fails validation, the workflow permits one regeneration attempt and validates the revised output again. It does not retry indefinitely.
+**Guardrails And Failure Demos**
 
-## Installation
+- Invalid portfolio rejection before risk calculation
+- Unsupported tool rejection before execution
+- Commentary/report validation failure demo
+- Direct recommendation and fabricated metric guardrails
 
-Requires Python 3.10+.
+## Quickstart
 
-```bash
-pip install -e .
-```
-
-For local development and tests, install the `dev` extra:
+Install and test:
 
 ```bash
 pip install -e ".[dev]"
 pytest -q
 ```
 
-For LLM planning or commentary, create a project-root `.env` file:
+Run the primary deterministic/offline demo:
+
+```bash
+python examples/run_riskflow_agent_demo.py --planner rule --scenario full --show-plan
+```
+
+Run the LLM planner path when an API key is configured:
+
+```bash
+python examples/run_riskflow_agent_demo.py --planner llm --query "Check SA-CCR and SIMM readiness only." --show-plan
+```
+
+Run failure-case demos:
+
+```bash
+python examples/failure_cases/run_invalid_portfolio_demo.py
+python examples/failure_cases/run_report_validation_failure_demo.py
+```
+
+## Optional LLM Configuration
+
+The project works offline with `--planner rule`. In `--planner auto`, RiskFlow Agent uses the LLM planner when available and otherwise falls back clearly to the deterministic rule planner.
+
+For a project-root `.env` file:
 
 ```text
 OPENAI_API_KEY=your_api_key_here
@@ -179,9 +137,7 @@ OPENAI_MODEL=gpt-4o-mini
 # OPENAI_BASE_URL=https://your-compatible-endpoint/v1
 ```
 
-Do not commit `.env` or API keys. `.env` is listed in `.gitignore`.
-
-For a temporary PowerShell session instead of a `.env` file:
+For a temporary PowerShell session:
 
 ```powershell
 $env:OPENAI_API_KEY="your_api_key_here"
@@ -190,122 +146,75 @@ $env:OPENAI_MODEL="gpt-4o-mini"
 # $env:OPENAI_BASE_URL="https://your-compatible-endpoint/v1"
 ```
 
-The credit-risk demo uses deterministic commentary and does not require an API key.
+Do not commit API keys. `.env` is ignored by `.gitignore`.
 
-## Quick Start
+## Primary Demo
 
-Run the complete test suite:
-
-```bash
-pytest -q
-```
-
-Run the recommended policy-constrained autonomous planning demo:
+The official entry point is:
 
 ```bash
 python examples/run_riskflow_agent_demo.py
 ```
 
-The primary demo is a thin wrapper around `src.workflow.run_agent_workflow()`.
-It defaults to `--scenario full` and supports:
+Useful flags:
 
 - `--planner auto | llm | rule`
 - `--scenario full | market | credit | regulatory`
-- `--query "custom user request"`
-- `--show-plan` to display the approved tool sequence
-- `--trace-file` to save the internal execution trace as JSON
+- `--query "custom request"`
+- `--show-plan`
+- `--trace-file`
 
-```bash
-python examples/run_riskflow_agent_demo.py --scenario market --show-plan
-```
+The default full scenario uses sample market and credit inputs under `examples/` and a fixed market data window from `2023-01-01` through `2024-12-31` via `examples/sample_risk_config.json`.
 
-`--planner auto` uses LLM planning when an API key is available and otherwise falls back to the rule planner with an explicit message. Use `--planner rule` for deterministic offline demos.
+Older module-level demos are archived under `examples/legacy/` for reference. They are not the main project entry point.
 
-To smoke test the real LLM planner, set an API key and run:
+## Structured Output
 
-```bash
-OPENAI_API_KEY=your_api_key_here
-python examples/run_riskflow_agent_demo.py --planner llm --query "Check SA-CCR and SIMM readiness only." --show-plan
-```
+The workflow returns a structured result containing:
 
-The default full scenario fetches live historical market data for the fixed
-window from `2023-01-01` through `2024-12-31`, as configured in
-`examples/sample_risk_config.json`.
+- `user_report`: clean user-facing report.
+- `execution_trace`: auditable internal workflow/tool trace.
+- `validation_result`: deterministic guardrail checks, errors, and warnings.
+- `raw_outputs`: underlying analytics results.
+- `orchestration_trace`: plan and route summary with `proposed_plan_steps`, `approved_plan_steps`, `selected_route`, `executed_tools`, `skipped_or_unsupported_tools`, and `validation_status`.
 
-Older module-level demos are archived under `examples/legacy/` for reference.
+This separation keeps stdout readable while preserving enough detail for inspection, testing, and audit-style review.
 
-## Failure-Case Demos
+The approved plan is intentionally mapped into constrained deterministic routes such as `market`, `credit`, `regulatory`, or `full`. RiskFlow Agent is not a fully dynamic DAG executor yet; this route mapping is deliberate for financial risk control, reproducibility, and easier validation.
 
-Demonstrate portfolio validation stopping execution before risk calculation:
+## Interview Framing
 
-```bash
-python examples/failure_cases/run_invalid_portfolio_demo.py
-```
+When discussing the project, frame it as a controlled agentic risk workflow:
 
-Optionally save the partial failed trace:
+- The LLM is used for workflow planning and analyst-style explanation, not for risk math.
+- Python tools own deterministic market-risk, credit-risk/PFE, and regulatory-readiness calculations.
+- The plan validator is the execution gate: unsupported tools and invalid ordering do not run.
+- Report validators are the output gate: commentary must match calculated metrics and stay within guardrails.
+- Execution trace makes the workflow inspectable, which is critical for risk analytics governance.
+- Regulatory work is intentionally readiness-focused; the project does not pretend to implement SA-CCR or SIMM capital.
 
-```bash
-python examples/failure_cases/run_invalid_portfolio_demo.py --trace-file
-```
+This aligns with AI-enabled quant developer work: agentic coding, tool orchestration, controlled autonomy, explainability, and financial risk analytics.
 
-Demonstrate report/commentary validation with an intentionally inconsistent VaR value:
+## Limitations / Intentional Scope Boundaries
 
-```bash
-python examples/failure_cases/run_report_validation_failure_demo.py
-```
+- No production pricing engine.
+- No Monte Carlo path generation.
+- No real SA-CCR capital calculation.
+- No real SIMM / RegIM margin calculation.
+- No XVA, PD/LGD/EAD, or regulatory capital stack.
+- No production deployment, persistence, or distributed execution.
+- No unrestricted autonomous tool execution.
+- Market risk focuses on historical equity/ETF-style portfolios.
+- Methodology retrieval is local and keyword-based, not vector-based.
 
-## Example Output Snapshot
+## Next Extensions
 
-The full demo begins with a `Combined Executive Summary` covering the active modules: **Market Risk**, **Credit Risk**, and **Regulatory Risk**.
-
-Representative market-risk results:
-
-- Annualized volatility: 26.71%
-- 95% historical VaR: 2.32%
-- 95% Expected Shortfall: 3.47%
-- Maximum drawdown: 23.77%
-- Stress scenario loss: 22.50%
-- Validation: PASSED
-
-Representative Credit Risk results:
-
-- Peak 95% PFE: USD 2,100,000
-- Peak 99% PFE: USD 2,600,000
-- EPE: USD 1,080,000
-- Largest netting set: NS-001
-- Validation: PASSED
-
-Representative Regulatory Risk readiness output:
-
-- SA-CCR readiness: WARNING
-- SIMM / RegIM readiness: WARNING
-- Regulatory capital calculation: Not performed
-- SA-CCR missing inputs: trade_type, notional, maturity, asset_class, supervisory_category
-- SIMM / RegIM missing inputs: risk_factor_sensitivities, margin_class, product_class, risk_factor_type, currency
-- Guardrail: no regulatory capital number is generated from insufficient inputs
-- Validation: PASSED
-
-## Limitations
-
-- LLM planning is constrained to JSON tool proposals and deterministic validation; malformed or unsupported plans do not execute.
-- Market risk is historical and focused on simple equity/ETF portfolios.
-- Only historical VaR is implemented; no parametric or Monte Carlo VaR is available.
-- Concentration observations are based on weights and ticker composition, not a formal factor model.
-- Stress testing uses deterministic ticker proxies rather than full revaluation.
-- PFE analytics consume supplied profiles rather than generating exposures from trades.
-- XVA, PD/LGD/EAD, SIMM, and RegIM are not implemented.
-- SA-CCR readiness is screened, but SA-CCR capital is not calculated.
-- Methodology retrieval is local and keyword-based, without embeddings or vector search.
-- Tool execution is synchronous and in-process, with no durable workflow state.
-- LLM commentary quality depends on the configured model despite deterministic validation controls.
-
-## Future Extensions
-
-- Improve retrieval with embeddings, vector search, and stronger ranking.
-- Add formal factor exposure and richer scenario or full-revaluation stress models.
-- Generate exposure profiles from pricing simulations and extend toward XVA analytics.
-- Add SA-CCR exposure and capital calculations; SA-CCR is not currently implemented.
-- Add durable execution state, richer observability, and PDF/HTML report export.
+- Typed execution graph compiled from the approved plan.
+- Dollar VaR / ES reporting with portfolio notional.
+- Richer regulatory input schema and readiness coverage.
+- Optional vector-based methodology retrieval.
+- More formal factor exposure and stress scenario libraries.
+- Report export to PDF or HTML.
 
 ## Disclaimer
 

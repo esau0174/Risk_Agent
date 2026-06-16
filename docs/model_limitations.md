@@ -1,7 +1,7 @@
 # Model Limitations
 
 ## Purpose
-Define the interpretation boundaries and guardrails shared by FinRisk analytics.
+Define the interpretation boundaries and guardrails shared by RiskFlow analytics.
 
 ## Inputs
 - Calculated risk or exposure results

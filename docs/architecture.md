@@ -28,6 +28,8 @@ Each capability is registered as a named tool. Planned steps and actual tool cal
 
 LLM-proposed plans cannot execute directly. `plan_validator.py` rejects unknown tools, unsupported regulatory capital/margin tools, and misordered plans before execution. The LLM is not allowed to calculate VaR, Expected Shortfall, PFE, SA-CCR, SIMM, RegIM, capital, margin, or any risk number.
 
+The approved plan is mapped into constrained deterministic workflow routes rather than executed as an unrestricted dynamic DAG. The agent result includes an `orchestration_trace` with `proposed_plan_steps`, `approved_plan_steps`, `selected_route`, `executed_tools`, `skipped_or_unsupported_tools`, and `validation_status`. This makes the current control model explicit: the planner proposes scope, the validator approves supported tools, and the executor runs reproducible risk routes.
+
 The recommended project entry point is `examples/run_riskflow_agent_demo.py`. It is a thin wrapper around `src.workflow.run_agent_workflow()`, which supports `planner_mode="auto" | "llm" | "rule"`. In `auto` mode the workflow uses the LLM planner when available and otherwise falls back clearly to the rule planner. Older demos are archived under `examples/legacy/`.
 
 ## Input Model

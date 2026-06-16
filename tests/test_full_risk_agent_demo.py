@@ -96,7 +96,11 @@ def test_primary_demo_optionally_saves_execution_trace(monkeypatch, tmp_path):
 
     module.main(["--trace-file", str(trace_path)])
 
-    assert json.loads(trace_path.read_text(encoding="utf-8")) == result.execution_trace
+    trace_payload = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert trace_payload == {
+        "orchestration_trace": result.orchestration_trace,
+        "execution_trace": result.execution_trace,
+    }
 
 
 def test_primary_demo_prints_selected_module_reports(monkeypatch, capsys):

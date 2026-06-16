@@ -100,6 +100,13 @@ def run_agent_workflow(
         )
 
     if not plan_validation_result.passed:
+        orchestration_trace = _build_orchestration_trace(
+            proposed_plan=plan,
+            approved_plan=None,
+            selected_route=None,
+            execution_trace=[],
+            validation_status="FAILED",
+        )
         return AgentWorkflowResult(
             query=effective_query,
             scenario=scenario,
@@ -115,9 +122,17 @@ def run_agent_workflow(
             planner_mode=planning["mode"],
             planner_message=planning["message"],
             planner_warnings=planning["warnings"],
+            orchestration_trace=orchestration_trace,
         )
 
     executed = _execute_approved_route(execution_route)
+    orchestration_trace = _build_orchestration_trace(
+        proposed_plan=plan,
+        approved_plan=plan,
+        selected_route=execution_route,
+        execution_trace=executed["execution_trace"],
+        validation_status="PASSED",
+    )
     return AgentWorkflowResult(
         query=effective_query,
         scenario=scenario,
@@ -133,6 +148,7 @@ def run_agent_workflow(
         planner_mode=planning["mode"],
         planner_message=planning["message"],
         planner_warnings=planning["warnings"],
+        orchestration_trace=orchestration_trace,
     )
 
 
@@ -436,3 +452,40 @@ def _limit_utilization_line(pfe_metrics: dict) -> str:
         f"- Limit utilization: {pfe_metrics['limit_utilization']:.2%} of "
         f"USD {pfe_metrics['configured_limit']:,.2f}"
     )
+
+
+def _build_orchestration_trace(
+    proposed_plan: WorkflowPlan,
+    approved_plan: WorkflowPlan | None,
+    selected_route: str | None,
+    execution_trace: list[dict],
+    validation_status: str,
+) -> dict:
+    proposed_plan_steps = _plan_tool_names(proposed_plan)
+    approved_plan_steps = _plan_tool_names(approved_plan)
+    executed_tools = [
+        entry.get("tool_name")
+        for entry in execution_trace
+        if isinstance(entry, dict) and entry.get("tool_name")
+    ]
+    skipped_or_unsupported_tools = (
+        proposed_plan_steps if approved_plan is None else []
+    )
+    return {
+        "proposed_plan_steps": proposed_plan_steps,
+        "approved_plan_steps": approved_plan_steps,
+        "selected_route": selected_route,
+        "executed_tools": executed_tools,
+        "skipped_or_unsupported_tools": skipped_or_unsupported_tools,
+        "validation_status": validation_status,
+        "route_mapping_note": (
+            "Approved scope is mapped into constrained deterministic risk workflow "
+            "routes for financial risk control and reproducibility."
+        ),
+    }
+
+
+def _plan_tool_names(plan: WorkflowPlan | None) -> list[str]:
+    if plan is None:
+        return []
+    return [step.tool_name for step in plan.steps]

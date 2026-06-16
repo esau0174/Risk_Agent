@@ -292,6 +292,12 @@ def test_run_agent_workflow_market_only_scenario(monkeypatch):
     assert "Market Risk" in result.final_report_summary
     assert result.execution_trace[0]["tool_name"] == "calculate_risk_metrics"
     assert "market_risk" in result.raw_outputs
+    assert result.orchestration_trace["proposed_plan_steps"]
+    assert result.orchestration_trace["approved_plan_steps"]
+    assert result.orchestration_trace["selected_route"] == "market"
+    assert result.orchestration_trace["executed_tools"] == ["calculate_risk_metrics"]
+    assert result.orchestration_trace["skipped_or_unsupported_tools"] == []
+    assert result.orchestration_trace["validation_status"] == "PASSED"
 
 
 def test_run_agent_workflow_credit_only_scenario(monkeypatch):
@@ -356,6 +362,13 @@ def test_run_agent_workflow_invalid_plan_does_not_execute(monkeypatch):
     assert result.execution_trace == []
     assert result.raw_outputs == {}
     assert result.final_report_summary == "Approved Plan: none; execution was not started."
+    assert result.orchestration_trace["approved_plan_steps"] == []
+    assert result.orchestration_trace["selected_route"] is None
+    assert result.orchestration_trace["executed_tools"] == []
+    assert result.orchestration_trace["skipped_or_unsupported_tools"] == [
+        "calculate_sa_ccr_capital"
+    ]
+    assert result.orchestration_trace["validation_status"] == "FAILED"
 
 
 def test_llm_planner_valid_market_plan(monkeypatch):

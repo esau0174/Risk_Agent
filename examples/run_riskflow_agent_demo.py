@@ -36,6 +36,8 @@ def main(argv: list[str] | None = None) -> None:
     print()
     print("Autonomous Planning Summary")
     print(f"- Planner: {result.planner_message}")
+    if result.orchestration_trace.get("selected_route"):
+        print(f"- Selected deterministic route: {result.orchestration_trace['selected_route']}")
     approved_tool_count = (
         len(_display_steps(result.approved_plan, result.scenario))
         if result.approved_plan is not None
@@ -70,15 +72,21 @@ def main(argv: list[str] | None = None) -> None:
     print(_validation_summary(result.validation_result))
 
     if args.trace_file:
-        save_execution_trace(result.execution_trace, args.trace_file)
+        save_execution_trace(result, args.trace_file)
 
 
-def save_execution_trace(execution_trace: list[dict], trace_file: str | Path) -> Path:
+def save_execution_trace(result, trace_file: str | Path) -> Path:
     """Write the structured execution trace to a JSON file."""
     path = Path(trace_file)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps(execution_trace, indent=2),
+        json.dumps(
+            {
+                "orchestration_trace": result.orchestration_trace,
+                "execution_trace": result.execution_trace,
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
     return path

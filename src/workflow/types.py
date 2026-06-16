@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from src.report_validator import ValidationResult
 
@@ -29,6 +29,7 @@ class AgentWorkflowResult:
     planner_mode: str = "rule"
     planner_message: str = "Rule-based planner with deterministic validation"
     planner_warnings: list[str] | None = None
+    orchestration_trace: dict = field(default_factory=dict)
 
 
 @dataclass

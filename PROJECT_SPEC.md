@@ -1,5 +1,9 @@
 # RiskFlow Agent Project Spec
 
+> Historical phase-1 spec. The current RiskFlow Agent architecture is documented in
+> [docs/architecture.md](docs/architecture.md). This file is retained for development
+> history and should not be read as the current implementation scope.
+
 ## Project Name
 
 RiskFlow Agent
