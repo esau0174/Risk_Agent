@@ -15,6 +15,9 @@ MODULE_ALIASES = {
     "regulatory risk": "regulatory_risk",
     "regulatory_risk": "regulatory_risk",
     "regulatory": "regulatory_risk",
+    "sa-ccr": "regulatory_risk",
+    "simm": "regulatory_risk",
+    "regim": "regulatory_risk",
 }
 
 

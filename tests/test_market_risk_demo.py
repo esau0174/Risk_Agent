@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def test_market_risk_demo_uses_shared_formatting_and_result_sections():
-    demo_path = Path("examples/run_llm_agent_demo.py")
+    demo_path = Path("examples/legacy/run_llm_agent_demo.py")
     source = demo_path.read_text(encoding="utf-8")
 
     assert "from examples.demo_utils import" in source

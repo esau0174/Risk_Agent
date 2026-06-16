@@ -182,28 +182,26 @@ pytest -q
 Run the recommended policy-constrained autonomous planning demo:
 
 ```bash
-python examples/run_autonomous_planning_demo.py
+python examples/run_riskflow_agent_demo.py
 ```
 
-The autonomous demo defaults to `--scenario full` and supports:
+The primary demo is a thin wrapper around `src.workflow.run_agent_workflow()`.
+It defaults to `--scenario full` and supports:
 
 - `--scenario full | market | credit | regulatory`
 - `--query "custom user request"`
 - `--show-plan` to display the approved tool sequence
+- `--trace-file` to save the internal execution trace as JSON
 
 ```bash
-python examples/run_autonomous_planning_demo.py --scenario market --show-plan
+python examples/run_riskflow_agent_demo.py --scenario market --show-plan
 ```
 
-For deterministic baseline or regression checks, run the full workflow demo:
+The default full scenario fetches live historical market data for the fixed
+window from `2023-01-01` through `2024-12-31`, as configured in
+`examples/sample_risk_config.json`.
 
-```bash
-python examples/run_full_risk_agent_demo.py
-```
-
-That baseline demo fetches live historical market data for the fixed window from `2023-01-01` through `2024-12-31`, as configured in `examples/sample_risk_config.json`. It can also save the internal execution trace with `--trace-file`.
-
-Focused market-risk and counterparty/PFE demos remain available in `examples/run_llm_agent_demo.py` and `examples/run_credit_risk_demo.py`.
+Older module-level demos are archived under `examples/legacy/` for reference.
 
 ## Failure-Case Demos
 

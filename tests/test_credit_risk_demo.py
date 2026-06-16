@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def test_credit_risk_demo_exists_with_expected_title_and_shared_workflow():
-    demo_path = Path("examples/run_credit_risk_demo.py")
+    demo_path = Path("examples/legacy/run_credit_risk_demo.py")
     source = demo_path.read_text(encoding="utf-8")
 
     assert demo_path.exists()

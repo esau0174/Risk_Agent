@@ -24,7 +24,7 @@ Each capability is registered as a named tool. Planned steps and actual tool cal
 
 Planning is deterministic. The current workflow does not use an LLM to choose tools or dynamically create execution paths.
 
-The recommended project entry point is `examples/run_autonomous_planning_demo.py`. It proposes a workflow from the user query, available schemas, requested modules, and registered tool names, then validates the proposed tool sequence before delegating to the deterministic execution path. The deterministic full demo remains available as a baseline and regression demo.
+The recommended project entry point is `examples/run_riskflow_agent_demo.py`. It is a thin wrapper around `src.workflow.run_agent_workflow()`, which proposes a workflow from the user query, available schemas, requested modules, and registered tool names, validates the proposed tool sequence, and then delegates to the deterministic execution path. Older demos are archived under `examples/legacy/`.
 
 ## Input Model
 
@@ -173,14 +173,14 @@ Validation preserves deterministic check ordering and returns structured checks,
 
 ## Presentation And Trace Serialization
 
-`src/workflow/presentation.py` converts the market and credit `WorkflowResult` objects into an `AgentRunResult`. The autonomous planning demo is the primary user-facing entry point and supports `--scenario full|market|credit|regulatory`, `--query`, and `--show-plan`. The deterministic full demo prints only `user_report` by default. Passing `--trace-file` to `examples/run_full_risk_agent_demo.py` writes the internal `execution_trace` to `logs/full_demo_trace.json`, or to a supplied path.
+`src/workflow/presentation.py` converts the market and credit `WorkflowResult` objects into an `AgentRunResult`. The primary user-facing demo is `examples/run_riskflow_agent_demo.py`, which calls `run_agent_workflow()` and supports `--scenario full|market|credit|regulatory`, `--query`, `--show-plan`, and `--trace-file`. Passing `--trace-file` writes the internal `execution_trace` to JSON while stdout remains presentation-oriented.
 
 Failure behavior is demonstrated separately under `examples/failure_cases/`:
 
 - `run_invalid_portfolio_demo.py` shows portfolio validation preventing risk calculation and can save the partial failed trace with `--trace-file`.
 - `run_report_validation_failure_demo.py` passes intentionally inconsistent commentary to the report validator and displays its errors and warnings.
 
-These presentation scripts call existing workflow and validation APIs; they do not duplicate analytics or orchestration logic.
+These presentation scripts call existing workflow and validation APIs; they do not duplicate analytics or orchestration logic. Archived module-level examples remain under `examples/legacy/` for historical reference.
 
 ## Current Limitations
 

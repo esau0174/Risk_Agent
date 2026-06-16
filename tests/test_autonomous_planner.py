@@ -120,7 +120,11 @@ def test_run_agent_workflow_full_scenario(monkeypatch):
         agent_module,
         "run_full_risk_agent_workflow",
         lambda *args, **kwargs: SimpleNamespace(
-            user_report="Combined Executive Summary\nMarket Risk\nCredit Risk",
+            user_report=(
+                "RiskFlow Agent - Full Risk Workflow Demo\n"
+                "=======================================\n"
+                "Combined Executive Summary\nMarket Risk\nCredit Risk"
+            ),
             execution_trace=[
                 {
                     "step_number": 1,
@@ -141,60 +145,85 @@ def test_run_agent_workflow_full_scenario(monkeypatch):
     assert result.plan_validation_result.passed is True
     assert result.approved_plan is not None
     assert "Combined Executive Summary" in result.user_report
+    assert "RiskFlow Agent - Full Risk Workflow Demo" not in result.user_report
     assert result.execution_trace[0]["tool_name"] == "calculate_risk_metrics"
     assert result.validation_result == {"passed": True}
     assert "market_risk" in result.raw_outputs
 
 
-def test_run_agent_workflow_market_only_scenario(monkeypatch):
-    monkeypatch.setattr(
-        agent_module,
-        "run_risk_workflow",
-        lambda *args, **kwargs: SimpleNamespace(
-            execution_trace=[
-                SimpleNamespace(
-                    step_number=1,
-                    tool_name="calculate_risk_metrics",
-                    status="success",
-                    input_summary="Market inputs.",
-                    output_summary="Market metrics.",
-                    error=None,
-                )
-            ],
-            validation_result=SimpleNamespace(passed=True),
-        ),
+def _market_result():
+    return SimpleNamespace(
+        risk_report={
+            "risk_metrics": {
+                "annualized_volatility": 0.2671,
+                "historical_var": 0.0232,
+                "expected_shortfall": 0.0347,
+                "max_drawdown": 0.2377,
+            }
+        },
+        stress_test_results=[{"portfolio_loss_pct": 0.225}],
+        execution_trace=[
+            SimpleNamespace(
+                step_number=1,
+                tool_name="calculate_risk_metrics",
+                status="success",
+                input_summary="Market inputs.",
+                output_summary="Market metrics.",
+                error=None,
+            )
+        ],
+        validation_result=SimpleNamespace(passed=True),
+        llm_commentary="Market risk commentary.",
     )
+
+
+def _credit_result():
+    return SimpleNamespace(
+        pfe_result={
+            "peak_pfe_95": 2_100_000.0,
+            "peak_pfe_99": 2_600_000.0,
+            "epe": 1_080_000.0,
+            "largest_netting_set_by_peak_pfe": "NS-001",
+            "configured_limit": 2_500_000.0,
+            "limit_utilization": 0.84,
+            "limit_status": "PASSED",
+        },
+        execution_trace=[
+            SimpleNamespace(
+                step_number=1,
+                tool_name="calculate_pfe_metrics",
+                status="success",
+                input_summary="Credit inputs.",
+                output_summary="PFE metrics.",
+                error=None,
+            )
+        ],
+        validation_result=SimpleNamespace(passed=True),
+        llm_commentary="Credit risk commentary.",
+    )
+
+
+def test_run_agent_workflow_market_only_scenario(monkeypatch):
+    monkeypatch.setattr(agent_module, "run_risk_workflow", lambda *args, **kwargs: _market_result())
 
     result = run_agent_workflow(scenario="market")
 
     assert result.detected_modules == ["Market Risk"]
+    assert "Annualized volatility: 26.71%" in result.user_report
+    assert "95% historical VaR: 2.32%" in result.user_report
     assert "Market Risk" in result.final_report_summary
     assert result.execution_trace[0]["tool_name"] == "calculate_risk_metrics"
     assert "market_risk" in result.raw_outputs
 
 
 def test_run_agent_workflow_credit_only_scenario(monkeypatch):
-    monkeypatch.setattr(
-        agent_module,
-        "run_risk_workflow",
-        lambda *args, **kwargs: SimpleNamespace(
-            execution_trace=[
-                SimpleNamespace(
-                    step_number=1,
-                    tool_name="calculate_pfe_metrics",
-                    status="success",
-                    input_summary="Credit inputs.",
-                    output_summary="PFE metrics.",
-                    error=None,
-                )
-            ],
-            validation_result=SimpleNamespace(passed=True),
-        ),
-    )
+    monkeypatch.setattr(agent_module, "run_risk_workflow", lambda *args, **kwargs: _credit_result())
 
     result = run_agent_workflow(scenario="credit")
 
     assert result.detected_modules == ["Credit Risk"]
+    assert "Peak 95% PFE: USD 2,100,000.00" in result.user_report
+    assert "Limit utilization: 84.00% of USD 2,500,000.00" in result.user_report
     assert "Credit Risk" in result.final_report_summary
     assert result.execution_trace[0]["tool_name"] == "calculate_pfe_metrics"
     assert "credit_risk" in result.raw_outputs
@@ -208,6 +237,19 @@ def test_run_agent_workflow_regulatory_only_scenario():
     assert result.execution_trace[0]["tool_name"] == "assess_regulatory_readiness"
     assert result.validation_result.passed is True
     assert "regulatory_risk" in result.raw_outputs
+
+
+def test_run_agent_workflow_custom_regulatory_query_overrides_full_scenario():
+    result = run_agent_workflow(
+        query="Check SA-CCR and SIMM readiness only.",
+        scenario="full",
+    )
+
+    assert result.detected_modules == ["Regulatory Risk"]
+    assert "Market Risk" not in result.detected_modules
+    assert "Credit Risk" not in result.detected_modules
+    assert result.execution_trace[0]["tool_name"] == "assess_regulatory_readiness"
+    assert "SA-CCR readiness" in result.user_report
 
 
 def test_run_agent_workflow_invalid_plan_does_not_execute(monkeypatch):
@@ -238,8 +280,8 @@ def test_run_agent_workflow_invalid_plan_does_not_execute(monkeypatch):
 
 
 def _load_demo_module():
-    demo_path = Path("examples/run_autonomous_planning_demo.py")
-    spec = importlib.util.spec_from_file_location("run_autonomous_planning_demo", demo_path)
+    demo_path = Path("examples/run_riskflow_agent_demo.py")
+    spec = importlib.util.spec_from_file_location("run_riskflow_agent_demo", demo_path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
@@ -251,17 +293,18 @@ def test_autonomous_demo_scenarios_detect_distinct_modules(monkeypatch, capsys):
     monkeypatch.setattr(module, "run_agent_workflow", _fake_run_agent_workflow)
 
     expected_modules = {
-        "market": "Detected modules: Market Risk",
-        "credit": "Detected modules: Credit Risk",
-        "regulatory": "Detected modules: Regulatory Risk",
-        "full": "Detected modules: Market Risk, Credit Risk, Regulatory Risk",
+        "market": "Requested modules: Market Risk",
+        "credit": "Requested modules: Credit Risk",
+        "regulatory": "Requested modules: Regulatory Risk",
+        "full": "Requested modules: Market Risk, Credit Risk, Regulatory Risk",
     }
     for scenario, expected_line in expected_modules.items():
         module.main(["--scenario", scenario])
         output = capsys.readouterr().out
         assert expected_line in output
         assert "Approved Tool Sequence" not in output
-        assert "Final Report Summary" in output
+        assert "Risk Report" in output
+        assert "Validation / Guardrail Summary" in output
 
 
 def test_autonomous_demo_custom_query_and_show_plan(monkeypatch, capsys):
@@ -279,7 +322,7 @@ def test_autonomous_demo_custom_query_and_show_plan(monkeypatch, capsys):
     )
 
     output = capsys.readouterr().out
-    assert "- Query: Custom market risk request" in output
+    assert "User Request\nCustom market risk request" in output
     assert "Approved Tool Sequence" in output
     assert "calculate_risk_metrics" in output
 
@@ -296,6 +339,11 @@ def test_autonomous_demo_full_plan_displays_credit_exposure_loading(
     output = capsys.readouterr().out
     assert "load_exposure_profile - Load counterparty exposure profile" in output
     assert output.index("load_exposure_profile") < output.index("calculate_pfe_metrics")
+    assert "- Approved tool count: 11" in output
+    displayed_steps = [
+        line for line in output.splitlines() if line[:1].isdigit() and ". " in line
+    ]
+    assert len(displayed_steps) == 11
 
 
 def _fake_run_agent_workflow(query=None, scenario="full", proposed_plan=None):
@@ -314,9 +362,19 @@ def _fake_run_agent_workflow(query=None, scenario="full", proposed_plan=None):
         proposed_plan=plan,
         plan_validation_result=validation_result,
         approved_plan=plan if validation_result.passed else None,
-        user_report="Fake user report.",
+        user_report=_fake_user_report(scenario),
         final_report_summary=f"- Final report sections: {scenario}",
         execution_trace=[{"step_number": 1, "tool_name": "fake_tool"}],
         validation_result={"passed": validation_result.passed},
         raw_outputs={},
     )
+
+
+def _fake_user_report(scenario: str) -> str:
+    if scenario == "market":
+        return "Market Risk\n- Annualized volatility: 26.71%"
+    if scenario == "credit":
+        return "Credit Risk\n- Peak 95% PFE: USD 2,100,000.00"
+    if scenario == "regulatory":
+        return "Regulatory Risk\n- SA-CCR readiness: WARNING"
+    return "Combined Executive Summary\nMarket Risk\nCredit Risk\nRegulatory Risk"
