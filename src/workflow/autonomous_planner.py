@@ -56,7 +56,9 @@ def propose_autonomous_workflow_plan(
             selected_tools.append("run_stress_test")
 
     if "credit_risk" in modules:
-        if "load_portfolio_file" not in selected_tools:
+        if "exposure_profile" in schemas:
+            selected_tools.append("load_exposure_profile")
+        elif "load_portfolio_file" not in selected_tools:
             selected_tools.append("load_portfolio_file")
         if "load_risk_config" not in selected_tools:
             selected_tools.append("load_risk_config")

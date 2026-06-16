@@ -8,7 +8,7 @@ The calculations remain authoritative. The LLM may plan and explain, but it does
 
 ## High-Level Design
 
-RiskFlow Agent separates planning, deterministic workflow orchestration, domain analytics, and validation. The primary planner can use an LLM to propose registered tools from the user query and input context, while the rule planner remains the fallback/offline mode. Shared tools route structured inputs into market-risk, credit-risk, or regulatory-readiness modules, local methodology retrieval grounds commentary, and deterministic validators enforce numerical and policy guardrails. A presentation layer produces a clean user report while retaining raw analytics, validation results, and an auditable execution trace.
+RiskFlow Agent separates planning, deterministic workflow orchestration, domain analytics, and validation. The primary planner can use an LLM to propose registered tools from the user query and input context, while the rule planner remains the fallback/offline mode. Validated plans are executed sequentially through a lightweight approved-plan executor when their tools have explicit context adapters. Conservative deterministic route templates remain as a fallback for mappings that are not yet directly executable. Local methodology retrieval grounds commentary, and deterministic validators enforce numerical and policy guardrails. A presentation layer produces a clean user report while retaining raw analytics, validation results, and an auditable execution trace.
 
 **LLM plans. Python tools calculate. Validators gate execution and output.**
 
@@ -18,6 +18,8 @@ The application is not a single prompt or linear script. `src/workflow/` provide
 
 - `llm_planner.py` asks an LLM to propose a JSON-like workflow plan from the user query, input schemas, supported modules, and registered tools.
 - `autonomous_planner.py` provides the deterministic rule planner used for fallback/offline mode.
+- `plan_executor.py` executes approved registered tool steps sequentially through explicit context adapters.
+- `context.py` stores typed workflow state passed between approved-plan execution steps.
 - `planner.py` builds deterministic route plans, detects the loaded-data route, and infers active modules for the execution engine.
 - `engine.py` orchestrates the selected route and owns the high-level execution sequence.
 - `execution.py` invokes tools through `ToolExecutor` and records concise runtime trace entries.
@@ -26,9 +28,9 @@ The application is not a single prompt or linear script. `src/workflow/` provide
 
 Each capability is registered as a named tool. Planned steps and actual tool calls are separately inspectable through `WorkflowPlan` and `execution_trace`. Commentary is validated after generation, with one controlled regeneration attempt when validation fails.
 
-LLM-proposed plans cannot execute directly. `plan_validator.py` rejects unknown tools, unsupported regulatory capital/margin tools, and misordered plans before execution. The LLM is not allowed to calculate VaR, Expected Shortfall, PFE, SA-CCR, SIMM, RegIM, capital, margin, or any risk number.
+LLM-proposed plans cannot bypass validation. `plan_validator.py` rejects unknown tools, unsupported regulatory capital/margin tools, and misordered plans before execution. The LLM is not allowed to calculate VaR, Expected Shortfall, PFE, SA-CCR, SIMM, RegIM, capital, margin, or any risk number.
 
-The approved plan is mapped into constrained deterministic workflow routes rather than executed as an unrestricted dynamic DAG. The agent result includes an `orchestration_trace` with `proposed_plan_steps`, `approved_plan_steps`, `selected_route`, `executed_tools`, `skipped_or_unsupported_tools`, and `validation_status`. This makes the current control model explicit: the planner proposes scope, the validator approves supported tools, and the executor runs reproducible risk routes.
+The approved plan is preferably executed step by step by `ApprovedPlanExecutor`. If a step sequence is validated but not yet supported by direct context-based execution, the workflow falls back to constrained deterministic routes rather than executing an unrestricted dynamic DAG. The agent result includes an `orchestration_trace` with `execution_mode`, `proposed_plan_steps`, `approved_plan_steps`, `selected_route`, `executed_tools`, `skipped_or_unsupported_tools`, `validation_status`, and `route_mapping_note`. This makes the current control model explicit: the planner proposes scope, the validator approves supported tools, and the executor either runs approved steps sequentially or records a deterministic fallback.
 
 The recommended project entry point is `examples/run_riskflow_agent_demo.py`. It is a thin wrapper around `src.workflow.run_agent_workflow()`, which supports `planner_mode="auto" | "llm" | "rule"`. In `auto` mode the workflow uses the LLM planner when available and otherwise falls back clearly to the rule planner. Older demos are archived under `examples/legacy/`.
 

@@ -36,8 +36,10 @@ def main(argv: list[str] | None = None) -> None:
     print()
     print("Autonomous Planning Summary")
     print(f"- Planner: {result.planner_message}")
+    if result.orchestration_trace.get("execution_mode"):
+        print(f"- Execution mode: {result.orchestration_trace['execution_mode']}")
     if result.orchestration_trace.get("selected_route"):
-        print(f"- Selected deterministic route: {result.orchestration_trace['selected_route']}")
+        print(f"- Selected route: {result.orchestration_trace['selected_route']}")
     approved_tool_count = (
         len(_display_steps(result.approved_plan, result.scenario))
         if result.approved_plan is not None
@@ -64,6 +66,21 @@ def main(argv: list[str] | None = None) -> None:
         print("Approved Tool Sequence")
         _print_plan(result.approved_plan, scenario=result.scenario)
         print()
+
+    print("Execution Trace")
+    print(f"- Execution mode: {result.orchestration_trace.get('execution_mode', 'unknown')}")
+    print(f"- Selected route: {result.orchestration_trace.get('selected_route') or 'none'}")
+    executed_tools = result.orchestration_trace.get("executed_tools") or []
+    skipped_tools = result.orchestration_trace.get("skipped_or_unsupported_tools") or []
+    print(f"- Executed tools: {', '.join(executed_tools) if executed_tools else 'none'}")
+    print(
+        "- Skipped / unsupported tools: "
+        f"{', '.join(skipped_tools) if skipped_tools else 'none'}"
+    )
+    route_mapping_note = result.orchestration_trace.get("route_mapping_note")
+    if route_mapping_note:
+        print(f"- Route mapping note: {route_mapping_note}")
+    print()
 
     print("Risk Report")
     print(result.user_report or result.final_report_summary)
@@ -108,6 +125,8 @@ def _display_steps(plan, scenario: str) -> list[tuple[str, str]]:
     display_steps = []
     inserted_credit_loader = False
     for tool_name, description in steps:
+        if tool_name == "load_exposure_profile":
+            inserted_credit_loader = True
         if tool_name == "calculate_pfe_metrics" and not inserted_credit_loader:
             display_steps.append(
                 (

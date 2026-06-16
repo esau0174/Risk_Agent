@@ -45,6 +45,13 @@ _REGISTERED_TOOLS: tuple[RiskTool, ...] = (
         handler=load_portfolio_file,
     ),
     RiskTool(
+        name="load_exposure_profile",
+        module="shared",
+        description="Load and validate a counterparty exposure profile from CSV, XLSX, or JSON.",
+        callable_name="src.portfolio_loader.load_portfolio_file",
+        handler=load_portfolio_file,
+    ),
+    RiskTool(
         name="calculate_pfe_metrics",
         module="credit_risk",
         description="Calculate peak PFE and expected exposure profile metrics.",

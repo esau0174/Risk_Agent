@@ -110,6 +110,7 @@ def test_autonomous_planner_proposes_all_requested_risk_modules():
     assert "assess_regulatory_readiness" in tool_names
     assert set(tool_names) <= {
         "load_portfolio_file",
+        "load_exposure_profile",
         "validate_portfolio",
         "load_risk_config",
         "calculate_risk_metrics",
@@ -194,25 +195,95 @@ def test_plan_validator_rejects_misordered_tools():
 
 
 def test_run_agent_workflow_full_scenario(monkeypatch):
+    class FakeApprovedPlanExecutor:
+        def can_execute(self, plan, context):
+            return True
+
+        def execute(self, plan, context):
+            context.risk_report = {
+                "risk_metrics": {
+                    "annualized_volatility": 0.2671,
+                    "historical_var": 0.0232,
+                    "expected_shortfall": 0.0347,
+                    "max_drawdown": 0.2377,
+                }
+            }
+            context.stress_test_results = [{"portfolio_loss_pct": 0.225}]
+            context.pfe_result = {
+                "peak_pfe_95": 2_100_000.0,
+                "peak_pfe_99": 2_600_000.0,
+                "epe": 1_080_000.0,
+                "largest_netting_set_by_peak_pfe": "NS-001",
+                "configured_limit": 2_500_000.0,
+                "limit_utilization": 0.84,
+                "limit_status": "PASSED",
+            }
+            context.regulatory_readiness = {
+                "overall_status": "WARNING",
+                "missing_inputs": [
+                    "trade_type",
+                    "notional",
+                    "maturity",
+                    "asset_class",
+                    "supervisory_category",
+                    "risk_factor_sensitivities",
+                    "margin_class",
+                    "product_class",
+                    "risk_factor_type",
+                    "currency",
+                ],
+                "sa_ccr": {
+                    "status": "WARNING",
+                    "missing_required_fields": [
+                        "trade_type",
+                        "notional",
+                        "maturity",
+                        "asset_class",
+                        "supervisory_category",
+                    ],
+                },
+                "simm_regim": {
+                    "status": "WARNING",
+                    "missing_required_fields": [
+                        "risk_factor_sensitivities",
+                        "margin_class",
+                        "product_class",
+                        "risk_factor_type",
+                        "currency",
+                    ],
+                },
+                "regulatory_capital_calculation": "Not performed",
+                "guardrail": "No regulatory capital number was generated from insufficient inputs",
+            }
+            context.market_commentary = (
+                "Historical VaR and Expected Shortfall describe downside risk for "
+                "SPY, QQQ, NVDA, and TLT. Stress Testing and Concentration Risk "
+                "methodology references apply."
+            )
+            context.credit_commentary = (
+                "Counterparty Exposure / PFE Analysis: Peak 95% PFE and EPE "
+                "summarize the exposure profile and netting set limit utilization."
+            )
+            context.market_validation_result = SimpleNamespace(passed=True)
+            context.credit_validation_result = SimpleNamespace(passed=True)
+            context.report_validation_result = SimpleNamespace(passed=True)
+            context.execution_trace = [
+                {
+                    "step_number": index,
+                    "tool_name": step.tool_name,
+                    "status": "success",
+                    "input_summary": "fake input",
+                    "output_summary": "fake output",
+                    "error": None,
+                }
+                for index, step in enumerate(plan.steps, start=1)
+            ]
+            return context
+
     monkeypatch.setattr(
         agent_module,
-        "run_full_risk_agent_workflow",
-        lambda *args, **kwargs: SimpleNamespace(
-            user_report=(
-                "RiskFlow Agent - Full Risk Workflow Demo\n"
-                "=======================================\n"
-                "Combined Executive Summary\nMarket Risk\nCredit Risk"
-            ),
-            execution_trace=[
-                {
-                    "step_number": 1,
-                    "tool_name": "calculate_risk_metrics",
-                    "status": "success",
-                }
-            ],
-            validation_result={"passed": True},
-            raw_outputs={"market_risk": {}, "credit_risk": {}, "regulatory_risk": {}},
-        ),
+        "ApprovedPlanExecutor",
+        lambda: FakeApprovedPlanExecutor(),
     )
 
     result = run_agent_workflow(scenario="full", planner_mode="rule")
@@ -222,11 +293,22 @@ def test_run_agent_workflow_full_scenario(monkeypatch):
     assert result.detected_modules == ["Market Risk", "Credit Risk", "Regulatory Risk"]
     assert result.plan_validation_result.passed is True
     assert result.approved_plan is not None
-    assert "Combined Executive Summary" in result.user_report
+    assert "Market Risk" in result.user_report
+    assert "Credit Risk" in result.user_report
+    assert "Regulatory Risk" in result.user_report
     assert "RiskFlow Agent - Full Risk Workflow Demo" not in result.user_report
-    assert result.execution_trace[0]["tool_name"] == "calculate_risk_metrics"
-    assert result.validation_result == {"passed": True}
+    assert result.execution_trace[0]["tool_name"] == "load_portfolio_file"
+    assert "load_exposure_profile" in result.orchestration_trace["executed_tools"]
+    assert result.validation_result["passed"] is True
     assert "market_risk" in result.raw_outputs
+    assert result.orchestration_trace["execution_mode"] == "approved_plan_executor"
+    market_section = result.user_report.split("Credit Risk", 1)[0]
+    credit_section = result.user_report.split("Credit Risk", 1)[1]
+    assert "Historical VaR" in market_section
+    assert "Expected Shortfall" in market_section
+    assert "Peak 95% PFE" not in market_section
+    assert "Peak 95% PFE" in credit_section
+    assert "EPE" in credit_section
 
 
 def _market_result():
@@ -282,34 +364,37 @@ def _credit_result():
 
 
 def test_run_agent_workflow_market_only_scenario(monkeypatch):
-    monkeypatch.setattr(agent_module, "run_risk_workflow", lambda *args, **kwargs: _market_result())
-
     result = run_agent_workflow(scenario="market", planner_mode="rule")
 
     assert result.detected_modules == ["Market Risk"]
-    assert "Annualized volatility: 26.71%" in result.user_report
-    assert "95% historical VaR: 2.32%" in result.user_report
+    assert "Annualized volatility:" in result.user_report
+    assert "95% historical VaR:" in result.user_report
     assert "Market Risk" in result.final_report_summary
-    assert result.execution_trace[0]["tool_name"] == "calculate_risk_metrics"
+    assert result.execution_trace[0]["tool_name"] == "load_portfolio_file"
+    assert "calculate_risk_metrics" in [
+        entry["tool_name"] for entry in result.execution_trace
+    ]
     assert "market_risk" in result.raw_outputs
     assert result.orchestration_trace["proposed_plan_steps"]
     assert result.orchestration_trace["approved_plan_steps"]
     assert result.orchestration_trace["selected_route"] == "market"
-    assert result.orchestration_trace["executed_tools"] == ["calculate_risk_metrics"]
+    assert result.orchestration_trace["execution_mode"] == "approved_plan_executor"
+    assert "calculate_risk_metrics" in result.orchestration_trace["executed_tools"]
     assert result.orchestration_trace["skipped_or_unsupported_tools"] == []
     assert result.orchestration_trace["validation_status"] == "PASSED"
 
 
 def test_run_agent_workflow_credit_only_scenario(monkeypatch):
-    monkeypatch.setattr(agent_module, "run_risk_workflow", lambda *args, **kwargs: _credit_result())
-
     result = run_agent_workflow(scenario="credit", planner_mode="rule")
 
     assert result.detected_modules == ["Credit Risk"]
     assert "Peak 95% PFE: USD 2,100,000.00" in result.user_report
     assert "Limit utilization: 84.00% of USD 2,500,000.00" in result.user_report
     assert "Credit Risk" in result.final_report_summary
-    assert result.execution_trace[0]["tool_name"] == "calculate_pfe_metrics"
+    assert result.execution_trace[0]["tool_name"] == "load_exposure_profile"
+    assert "calculate_pfe_metrics" in [
+        entry["tool_name"] for entry in result.execution_trace
+    ]
     assert "credit_risk" in result.raw_outputs
 
 
@@ -369,6 +454,7 @@ def test_run_agent_workflow_invalid_plan_does_not_execute(monkeypatch):
         "calculate_sa_ccr_capital"
     ]
     assert result.orchestration_trace["validation_status"] == "FAILED"
+    assert result.orchestration_trace["execution_mode"] == "not_executed"
 
 
 def test_llm_planner_valid_market_plan(monkeypatch):
@@ -706,9 +792,13 @@ def test_autonomous_demo_full_plan_displays_credit_exposure_loading(
     module.main(["--scenario", "full", "--show-plan"])
 
     output = capsys.readouterr().out
-    assert "load_exposure_profile - Load counterparty exposure profile" in output
+    assert "load_exposure_profile - Load and validate a counterparty exposure profile" in output
     assert output.index("load_exposure_profile") < output.index("calculate_pfe_metrics")
     assert "- Approved tool count: 11" in output
+    assert "Execution Trace" in output
+    assert "- Execution mode:" in output
+    assert "- Executed tools:" in output
+    assert "- Skipped / unsupported tools: none" in output
     displayed_steps = [
         line for line in output.splitlines() if line[:1].isdigit() and ". " in line
     ]

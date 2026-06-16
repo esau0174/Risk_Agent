@@ -6,6 +6,7 @@ from src.core.tool_registry import get_tool, list_registered_tools, list_tools_b
 EXPECTED_TOOL_NAMES = [
     "parse_portfolio",
     "load_portfolio_file",
+    "load_exposure_profile",
     "calculate_pfe_metrics",
     "assess_regulatory_readiness",
     "validate_portfolio",
@@ -21,6 +22,7 @@ EXPECTED_TOOL_NAMES = [
 EXPECTED_TOOL_MODULES = {
     "parse_portfolio": "shared",
     "load_portfolio_file": "shared",
+    "load_exposure_profile": "shared",
     "calculate_pfe_metrics": "credit_risk",
     "assess_regulatory_readiness": "regulatory_risk",
     "validate_portfolio": "market_risk",

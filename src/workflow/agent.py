@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 from src.core.tool_executor import ToolExecutor
 from src.core.tool_registry import list_registered_tools
 from src.validators.regulatory import validate_regulatory_readiness_report
 from src.workflow.autonomous_planner import propose_autonomous_workflow_plan
+from src.workflow.context import WorkflowExecutionContext
 from src.workflow.engine import run_risk_workflow
 from src.workflow.llm_planner import (
     is_llm_planner_available,
     propose_llm_workflow_plan,
 )
+from src.workflow.plan_executor import ApprovedPlanExecutor, PlanExecutionNotSupported
 from src.workflow.plan_validator import PlanValidationResult, validate_workflow_plan
 from src.workflow.presentation import run_full_risk_agent_workflow
 from src.workflow.types import AgentWorkflowResult, WorkflowPlan
@@ -106,6 +109,8 @@ def run_agent_workflow(
             selected_route=None,
             execution_trace=[],
             validation_status="FAILED",
+            execution_mode="not_executed",
+            route_mapping_note="Plan validation failed; execution was not started.",
         )
         return AgentWorkflowResult(
             query=effective_query,
@@ -125,13 +130,16 @@ def run_agent_workflow(
             orchestration_trace=orchestration_trace,
         )
 
-    executed = _execute_approved_route(execution_route)
+    executed = _execute_approved_plan_or_route(plan, execution_route, effective_query, scenario)
     orchestration_trace = _build_orchestration_trace(
         proposed_plan=plan,
         approved_plan=plan,
-        selected_route=execution_route,
+        selected_route=executed["selected_route"],
         execution_trace=executed["execution_trace"],
         validation_status="PASSED",
+        execution_mode=executed["execution_mode"],
+        route_mapping_note=executed["route_mapping_note"],
+        skipped_or_unsupported_tools=executed["skipped_or_unsupported_tools"],
     )
     return AgentWorkflowResult(
         query=effective_query,
@@ -308,7 +316,9 @@ def _execute_approved_route(route: str) -> dict:
         }
 
     readiness = ToolExecutor().execute("assess_regulatory_readiness", {}).output
-    report = _build_regulatory_report(readiness)
+    initial_report = _build_regulatory_report(readiness)
+    validation_result = validate_regulatory_readiness_report(initial_report, readiness)
+    report = _build_regulatory_report(readiness, validation_result=validation_result)
     validation_result = validate_regulatory_readiness_report(report, readiness)
     return {
         "user_report": report,
@@ -334,6 +344,155 @@ def _execute_approved_route(route: str) -> dict:
         "validation_result": validation_result,
         "raw_outputs": {"regulatory_risk": readiness},
     }
+
+
+def _execute_approved_plan_or_route(
+    plan: WorkflowPlan,
+    execution_route: str,
+    effective_query: str,
+    scenario: str,
+) -> dict:
+    context = WorkflowExecutionContext(
+        user_query=effective_query,
+        scenario=scenario,
+        market_data_file=MARKET_DATA_FILE,
+        credit_data_file=CREDIT_DATA_FILE,
+        config_file=CONFIG_FILE,
+        use_llm=False,
+        selected_route=execution_route,
+    )
+    plan_executor = ApprovedPlanExecutor()
+
+    try:
+        if not plan_executor.can_execute(plan, context):
+            raise PlanExecutionNotSupported(
+                "Approved plan contains steps that are not mapped for direct execution."
+            )
+        context = plan_executor.execute(plan, context)
+        executed = _outputs_from_plan_context(context)
+        executed["execution_mode"] = "approved_plan_executor"
+        executed["route_mapping_note"] = (
+            "Approved plan executed sequentially through the lightweight "
+            "ApprovedPlanExecutor."
+        )
+        executed["selected_route"] = execution_route
+        executed["skipped_or_unsupported_tools"] = []
+        return executed
+    except PlanExecutionNotSupported:
+        executed = _execute_approved_route(execution_route)
+        executed["execution_mode"] = "deterministic_route_fallback"
+        executed["route_mapping_note"] = (
+            "Approved plan mapped to deterministic route fallback."
+        )
+        executed["selected_route"] = execution_route
+        executed["skipped_or_unsupported_tools"] = []
+        return executed
+
+
+def _outputs_from_plan_context(context: WorkflowExecutionContext) -> dict:
+    raw_outputs: dict = {}
+    user_report_sections: list[str] = []
+    final_sections: list[str] = []
+    validation_result = None
+    validation_results: dict[str, dict] = {}
+
+    if context.risk_report is not None:
+        market_result = SimpleNamespace(
+            risk_report=context.risk_report,
+            stress_test_results=context.stress_test_results,
+            validation_result=(
+                context.market_validation_result
+                or context.report_validation_result
+            ),
+            llm_commentary=context.market_commentary or context.commentary or "",
+        )
+        user_report_sections.append(_build_market_report(market_result))
+        final_sections.append("Market Risk")
+        validation_result = context.market_validation_result or context.report_validation_result
+        validation_results["market_risk"] = _validation_result_as_dict(
+            context.market_validation_result or context.report_validation_result
+        )
+        raw_outputs["market_risk"] = {
+            "risk_report": context.risk_report,
+            "stress_test_results": context.stress_test_results,
+        }
+
+    if context.pfe_result is not None:
+        credit_result = SimpleNamespace(
+            pfe_result=context.pfe_result,
+            validation_result=(
+                context.credit_validation_result
+                or context.report_validation_result
+            ),
+            llm_commentary=context.credit_commentary or context.commentary or "",
+        )
+        user_report_sections.append(_build_credit_report(credit_result))
+        final_sections.append("Credit Risk")
+        validation_result = context.credit_validation_result or context.report_validation_result
+        validation_results["credit_risk"] = _validation_result_as_dict(
+            context.credit_validation_result or context.report_validation_result
+        )
+        raw_outputs["credit_risk"] = context.pfe_result
+
+    if context.regulatory_readiness is not None:
+        initial_regulatory_report = _build_regulatory_report(context.regulatory_readiness)
+        regulatory_validation = validate_regulatory_readiness_report(
+            initial_regulatory_report,
+            context.regulatory_readiness,
+        )
+        regulatory_report = _build_regulatory_report(
+            context.regulatory_readiness,
+            validation_result=regulatory_validation,
+        )
+        regulatory_validation = validate_regulatory_readiness_report(
+            regulatory_report,
+            context.regulatory_readiness,
+        )
+        context.regulatory_validation_result = regulatory_validation
+        user_report_sections.append(regulatory_report)
+        final_sections.append("Regulatory Risk")
+        validation_result = regulatory_validation
+        validation_results["regulatory_risk"] = _validation_result_as_dict(
+            regulatory_validation
+        )
+        raw_outputs["regulatory_risk"] = context.regulatory_readiness
+
+    if not user_report_sections:
+        user_report_sections.append("No executable risk report section was produced.")
+
+    if len(validation_results) > 1:
+        validation_result = {
+            "passed": all(result["passed"] for result in validation_results.values()),
+            **validation_results,
+        }
+
+    validation_passed = _validation_passed(validation_result)
+    return {
+        "user_report": "\n\n".join(user_report_sections),
+        "final_report_summary": (
+            f"- Validation: {'PASSED' if validation_passed else 'FAILED'}\n"
+            f"- Final report sections: {', '.join(final_sections) if final_sections else 'none'}"
+        ),
+        "execution_trace": context.execution_trace,
+        "validation_result": validation_result,
+        "raw_outputs": raw_outputs,
+    }
+
+
+def _validation_passed(validation_result) -> bool:
+    if validation_result is None:
+        return False
+    if isinstance(validation_result, dict):
+        return bool(validation_result.get("passed"))
+    return bool(getattr(validation_result, "passed", False))
+
+
+def _validation_result_as_dict(validation_result) -> dict:
+    if validation_result is None:
+        return {"passed": False}
+    if isinstance(validation_result, dict):
+        return {"passed": bool(validation_result.get("passed"))}
+    return {"passed": bool(getattr(validation_result, "passed", False))}
 
 
 def _default_input_schemas_for_query(query: str) -> list[str]:
@@ -431,18 +590,22 @@ def _build_credit_report(result) -> str:
     return "\n".join(lines)
 
 
-def _build_regulatory_report(readiness: dict) -> str:
-    return (
-        "Regulatory Risk\n"
-        f"- SA-CCR readiness: {readiness['sa_ccr']['status']}\n"
-        f"- SIMM / RegIM readiness: {readiness['simm_regim']['status']}\n"
-        f"- Regulatory capital calculation: {readiness['regulatory_capital_calculation']}\n"
+def _build_regulatory_report(readiness: dict, validation_result=None) -> str:
+    lines = [
+        "Regulatory Risk",
+        f"- SA-CCR readiness: {readiness['sa_ccr']['status']}",
+        f"- SIMM / RegIM readiness: {readiness['simm_regim']['status']}",
+        f"- Regulatory capital calculation: {readiness['regulatory_capital_calculation']}",
         "- SA-CCR missing inputs: "
-        f"{', '.join(readiness['sa_ccr']['missing_required_fields'])}\n"
+        f"{', '.join(readiness['sa_ccr']['missing_required_fields'])}",
         "- SIMM / RegIM missing inputs: "
-        f"{', '.join(readiness['simm_regim']['missing_required_fields'])}\n"
-        f"- Guardrail: {readiness['guardrail']}"
-    )
+        f"{', '.join(readiness['simm_regim']['missing_required_fields'])}",
+        f"- Guardrail: {readiness['guardrail']}",
+    ]
+    if validation_result is not None:
+        status = "PASSED" if validation_result.passed else "FAILED"
+        lines.append(f"- Validation: {status}")
+    return "\n".join(lines)
 
 
 def _limit_utilization_line(pfe_metrics: dict) -> str:
@@ -460,6 +623,9 @@ def _build_orchestration_trace(
     selected_route: str | None,
     execution_trace: list[dict],
     validation_status: str,
+    execution_mode: str,
+    route_mapping_note: str,
+    skipped_or_unsupported_tools: list[str] | None = None,
 ) -> dict:
     proposed_plan_steps = _plan_tool_names(proposed_plan)
     approved_plan_steps = _plan_tool_names(approved_plan)
@@ -468,20 +634,20 @@ def _build_orchestration_trace(
         for entry in execution_trace
         if isinstance(entry, dict) and entry.get("tool_name")
     ]
-    skipped_or_unsupported_tools = (
-        proposed_plan_steps if approved_plan is None else []
+    skipped_tools = (
+        skipped_or_unsupported_tools
+        if skipped_or_unsupported_tools is not None
+        else proposed_plan_steps if approved_plan is None else []
     )
     return {
+        "execution_mode": execution_mode,
         "proposed_plan_steps": proposed_plan_steps,
         "approved_plan_steps": approved_plan_steps,
         "selected_route": selected_route,
         "executed_tools": executed_tools,
-        "skipped_or_unsupported_tools": skipped_or_unsupported_tools,
+        "skipped_or_unsupported_tools": skipped_tools,
         "validation_status": validation_status,
-        "route_mapping_note": (
-            "Approved scope is mapped into constrained deterministic risk workflow "
-            "routes for financial risk control and reproducibility."
-        ),
+        "route_mapping_note": route_mapping_note,
     }
 
 

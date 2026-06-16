@@ -13,7 +13,8 @@ This project is not just a portfolio VaR script wrapped in a chatbot. It separat
 - The planner proposes a workflow from the user query, input context, and registered tools.
 - The plan validator rejects unknown tools, unsupported regulatory capital/margin tools, and misordered workflows.
 - The tool registry exposes explicit deterministic capabilities for shared infrastructure, market risk, credit risk, and regulatory readiness.
-- The executor runs only approved registered tools.
+- The approved-plan executor runs validated tool steps sequentially when the mapping is supported.
+- A deterministic route fallback remains available for conservative, reproducible execution.
 - Risk metrics are calculated by Python modules, not by the LLM.
 - Commentary is grounded in calculated outputs and local methodology notes.
 - Report validators check numerical consistency, guardrails, and unsupported advice.
@@ -32,6 +33,9 @@ Deterministic plan validator
         |
         v
 Tool registry -> ToolExecutor
+        |
+        v
+Approved-plan executor
         |
         v
 Deterministic risk tools
@@ -53,7 +57,7 @@ Canonical package structure:
 
 - `src/core/`: tool registry, tool executor, risk configuration.
 - `src/data/`: portfolio parsing, file loading, portfolio utilities, market data.
-- `src/workflow/`: LLM planner, rule fallback planner, plan validator, engine, presentation types.
+- `src/workflow/`: LLM planner, rule fallback planner, plan validator, approved-plan executor, engine, presentation types.
 - `src/market_risk/`: volatility, historical VaR, Expected Shortfall, drawdown, stress testing.
 - `src/credit_risk/`: counterparty exposure profile and PFE analytics.
 - `src/regulatory_risk/`: SA-CCR and SIMM / RegIM readiness screening.
@@ -176,11 +180,11 @@ The workflow returns a structured result containing:
 - `execution_trace`: auditable internal workflow/tool trace.
 - `validation_result`: deterministic guardrail checks, errors, and warnings.
 - `raw_outputs`: underlying analytics results.
-- `orchestration_trace`: plan and route summary with `proposed_plan_steps`, `approved_plan_steps`, `selected_route`, `executed_tools`, `skipped_or_unsupported_tools`, and `validation_status`.
+- `orchestration_trace`: plan and execution summary with `execution_mode`, `proposed_plan_steps`, `approved_plan_steps`, `selected_route`, `executed_tools`, `skipped_or_unsupported_tools`, `validation_status`, and `route_mapping_note`.
 
 This separation keeps stdout readable while preserving enough detail for inspection, testing, and audit-style review.
 
-The approved plan is intentionally mapped into constrained deterministic routes such as `market`, `credit`, `regulatory`, or `full`. RiskFlow Agent is not a fully dynamic DAG executor yet; this route mapping is deliberate for financial risk control, reproducibility, and easier validation.
+The preferred execution path is a lightweight approved-plan executor that runs validated registered tools sequentially with explicit context adapters. When a validated plan cannot yet be mapped directly, RiskFlow Agent falls back to constrained deterministic routes such as `market`, `credit`, `regulatory`, or `full` and records that fallback in the orchestration trace. RiskFlow Agent is not a fully dynamic DAG executor; this design is deliberate for financial risk control, reproducibility, and easier validation.
 
 ## Interview Framing
 
@@ -189,6 +193,7 @@ When discussing the project, frame it as a controlled agentic risk workflow:
 - The LLM is used for workflow planning and analyst-style explanation, not for risk math.
 - Python tools own deterministic market-risk, credit-risk/PFE, and regulatory-readiness calculations.
 - The plan validator is the execution gate: unsupported tools and invalid ordering do not run.
+- The approved-plan executor is intentionally lightweight: supported tool steps execute sequentially, while unsupported mappings fall back to audited deterministic routes.
 - Report validators are the output gate: commentary must match calculated metrics and stay within guardrails.
 - Execution trace makes the workflow inspectable, which is critical for risk analytics governance.
 - Regulatory work is intentionally readiness-focused; the project does not pretend to implement SA-CCR or SIMM capital.
