@@ -15,6 +15,7 @@ from src.workflow import (
     validate_workflow_plan,
 )
 import src.workflow.agent as agent_module
+import src.workflow.llm_planner as llm_planner
 
 
 class _FakeResponse:
@@ -25,8 +26,10 @@ class _FakeResponse:
 class _FakeResponses:
     def __init__(self, output_text: str):
         self._output_text = output_text
+        self.last_kwargs = None
 
     def create(self, **kwargs):
+        self.last_kwargs = kwargs
         return _FakeResponse(self._output_text)
 
 
@@ -58,6 +61,38 @@ def _llm_payload(modules, tools):
             "planner_notes": [],
         }
     )
+
+
+def test_llm_planner_loads_env_model_and_base_url(monkeypatch):
+    captured_client_kwargs = {}
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            captured_client_kwargs.update(kwargs)
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://example.test/v1")
+    monkeypatch.setenv("OPENAI_MODEL", "test-planner-model")
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=FakeOpenAI))
+
+    client = llm_planner._create_openai_client()
+    fake_client = _FakeLLMClient(
+        _llm_payload(["Regulatory Risk"], ["assess_regulatory_readiness"])
+    )
+    llm_planner.propose_llm_workflow_plan(
+        "Check SA-CCR readiness.",
+        scenario="regulatory",
+        available_input_schemas=[],
+        registered_tools=agent_module.list_registered_tools(),
+        client=fake_client,
+    )
+
+    assert client is not None
+    assert captured_client_kwargs == {
+        "api_key": "test-key",
+        "base_url": "https://example.test/v1",
+    }
+    assert fake_client.responses.last_kwargs["model"] == "test-planner-model"
 
 
 def test_autonomous_planner_proposes_all_requested_risk_modules():
@@ -391,6 +426,41 @@ def test_llm_planner_valid_regulatory_plan():
     assert result.detected_modules == ["Regulatory Risk"]
     assert result.plan_validation_result.passed is True
     assert "SA-CCR readiness" in result.user_report
+
+
+def test_llm_planner_accepts_markdown_fenced_json():
+    client = _FakeLLMClient(
+        "```json\n"
+        + _llm_payload(
+            ["Regulatory Risk"],
+            ["assess_regulatory_readiness"],
+        )
+        + "\n```"
+    )
+
+    result = run_agent_workflow(
+        scenario="regulatory",
+        planner_mode="llm",
+        planner_client=client,
+    )
+
+    assert result.plan_validation_result.passed is True
+    assert result.detected_modules == ["Regulatory Risk"]
+    assert result.execution_trace[0]["tool_name"] == "assess_regulatory_readiness"
+
+
+def test_llm_planner_missing_required_fields_fails_safely():
+    client = _FakeLLMClient('{"detected_modules":["Regulatory Risk"]}')
+
+    result = run_agent_workflow(
+        scenario="regulatory",
+        planner_mode="llm",
+        planner_client=client,
+    )
+
+    assert result.plan_validation_result.passed is False
+    assert result.execution_trace == []
+    assert "missing required field" in result.planner_message
 
 
 def test_llm_planner_valid_full_plan(monkeypatch):

@@ -11,7 +11,7 @@ from src.core.tool_registry import RiskTool, get_tool
 from src.workflow.types import WorkflowPlan, WorkflowStep
 
 
-DEFAULT_LLM_PLANNER_MODEL = "gpt-4o-mini"
+DEFAULT_LLM_MODEL = "gpt-4o-mini"
 SUPPORTED_MODULES = ["Market Risk", "Credit Risk", "Regulatory Risk"]
 
 
@@ -56,7 +56,12 @@ def propose_llm_workflow_plan(
         raise ValueError("user_query must be a non-empty string.")
 
     client = client or _create_openai_client()
-    model = model or os.getenv("OPENAI_PLANNER_MODEL", DEFAULT_LLM_PLANNER_MODEL)
+    model = (
+        model
+        or os.getenv("OPENAI_MODEL")
+        or os.getenv("OPENAI_PLANNER_MODEL")
+        or DEFAULT_LLM_MODEL
+    )
     response = client.responses.create(
         model=model,
         input=[
@@ -85,10 +90,53 @@ def propose_llm_workflow_plan(
                 ),
             },
         ],
+        text={
+            "format": {
+                "type": "json_schema",
+                "name": "riskflow_workflow_plan",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "detected_modules": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": SUPPORTED_MODULES,
+                            },
+                        },
+                        "proposed_tools": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "tool_name": {"type": "string"},
+                                    "reason": {"type": "string"},
+                                },
+                                "required": ["tool_name", "reason"],
+                            },
+                        },
+                        "rationale": {"type": "string"},
+                        "planner_notes": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                    },
+                    "required": [
+                        "detected_modules",
+                        "proposed_tools",
+                        "rationale",
+                        "planner_notes",
+                    ],
+                },
+            }
+        },
     )
 
     try:
-        payload = json.loads(response.output_text)
+        payload = _parse_json_response_text(response.output_text)
     except (AttributeError, json.JSONDecodeError) as exc:
         raise LLMPlannerError("LLM planner returned malformed JSON.") from exc
 
@@ -103,10 +151,14 @@ def parse_llm_plan_payload(
     if not isinstance(payload, dict):
         raise LLMPlannerError("LLM planner response must be a JSON object.")
 
-    detected_modules = payload.get("detected_modules", [])
-    proposed_tools = payload.get("proposed_tools", [])
-    rationale = payload.get("rationale", "")
-    planner_notes = payload.get("planner_notes", [])
+    _require_fields(
+        payload,
+        ["detected_modules", "proposed_tools", "rationale", "planner_notes"],
+    )
+    detected_modules = payload["detected_modules"]
+    proposed_tools = payload["proposed_tools"]
+    rationale = payload["rationale"]
+    planner_notes = payload["planner_notes"]
 
     if not isinstance(detected_modules, list) or not all(
         isinstance(module, str) for module in detected_modules
@@ -114,8 +166,8 @@ def parse_llm_plan_payload(
         raise LLMPlannerError("LLM planner detected_modules must be a list of strings.")
     if not isinstance(proposed_tools, list) or not proposed_tools:
         raise LLMPlannerError("LLM planner proposed_tools must be a non-empty list.")
-    if planner_notes is None:
-        planner_notes = []
+    if not isinstance(rationale, str):
+        raise LLMPlannerError("LLM planner rationale must be a string.")
     if not isinstance(planner_notes, list):
         raise LLMPlannerError("LLM planner planner_notes must be a list.")
 
@@ -132,6 +184,33 @@ def parse_llm_plan_payload(
         rationale=str(rationale),
         planner_notes=[str(note) for note in planner_notes],
     )
+
+
+def _parse_json_response_text(output_text: str) -> dict:
+    if not isinstance(output_text, str) or not output_text.strip():
+        raise json.JSONDecodeError("Empty LLM planner response.", output_text or "", 0)
+    return json.loads(_strip_markdown_json_fence(output_text))
+
+
+def _strip_markdown_json_fence(output_text: str) -> str:
+    text = output_text.strip()
+    if not text.startswith("```"):
+        return text
+
+    lines = text.splitlines()
+    if len(lines) >= 3 and lines[0].strip().startswith("```") and lines[-1].strip() == "```":
+        return "\n".join(lines[1:-1]).strip()
+    return text
+
+
+def _require_fields(payload: dict, field_names: list[str]) -> None:
+    missing = [field_name for field_name in field_names if field_name not in payload]
+    if missing:
+        raise LLMPlannerError(
+            "LLM planner response missing required field(s): "
+            + ", ".join(missing)
+            + "."
+        )
 
 
 def _proposal_step(tool_proposal: dict, registered_tools: list[RiskTool]) -> WorkflowStep:
@@ -166,27 +245,32 @@ def _create_openai_client():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise LLMPlannerUnavailable("OPENAI_API_KEY is not configured.")
+    base_url = os.getenv("OPENAI_BASE_URL")
     try:
         from openai import OpenAI
     except ImportError as exc:
         raise LLMPlannerUnavailable(
             "The OpenAI Python SDK is required for LLM planning."
         ) from exc
-    return OpenAI(api_key=api_key)
+    client_kwargs = {"api_key": api_key}
+    if base_url:
+        client_kwargs["base_url"] = base_url
+    return OpenAI(**client_kwargs)
 
 
 def _planner_system_prompt(registered_tools: list[RiskTool]) -> str:
     tool_names = ", ".join(tool.name for tool in registered_tools)
     return (
-        "You are the RiskFlow Agent workflow planner. Propose a workflow plan as "
-        "strict JSON only. Do not execute tools. Do not calculate VaR, Expected "
+        "You are the RiskFlow Agent workflow planner. Return JSON only: no markdown, "
+        "no code fences, no prose outside the JSON object. Do not execute tools. "
+        "Do not calculate VaR, Expected "
         "Shortfall, PFE, SA-CCR, SIMM, RegIM, capital, margin, or any risk number. "
         "Risk calculations must be performed only by registered deterministic tools. "
         "SA-CCR / SIMM / RegIM capital or margin calculations are not implemented. "
         "Unsupported tools must not be proposed. The final plan will be rejected "
         "unless it passes deterministic validation. Supported modules are Market "
         "Risk, Credit Risk, and Regulatory Risk. Registered tools are: "
-        f"{tool_names}. Return exactly this JSON shape: "
+        f"{tool_names}. The JSON object must include exactly these top-level fields: "
         "{"
         '"detected_modules":["Market Risk"],'
         '"proposed_tools":[{"tool_name":"load_portfolio_file","reason":"..."}],'

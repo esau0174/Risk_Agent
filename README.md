@@ -170,13 +170,27 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
-For LLM commentary, create a local `.env` file:
+For LLM planning or commentary, create a project-root `.env` file:
 
 ```text
 OPENAI_API_KEY=your_api_key_here
+OPENAI_MODEL=gpt-4o-mini
+# Optional, only for compatible gateways or custom endpoints:
+# OPENAI_BASE_URL=https://your-compatible-endpoint/v1
 ```
 
-Do not commit `.env` or API keys. The credit-risk demo uses deterministic commentary and does not require an API key.
+Do not commit `.env` or API keys. `.env` is listed in `.gitignore`.
+
+For a temporary PowerShell session instead of a `.env` file:
+
+```powershell
+$env:OPENAI_API_KEY="your_api_key_here"
+$env:OPENAI_MODEL="gpt-4o-mini"
+# Optional:
+# $env:OPENAI_BASE_URL="https://your-compatible-endpoint/v1"
+```
+
+The credit-risk demo uses deterministic commentary and does not require an API key.
 
 ## Quick Start
 
@@ -206,6 +220,13 @@ python examples/run_riskflow_agent_demo.py --scenario market --show-plan
 ```
 
 `--planner auto` uses LLM planning when an API key is available and otherwise falls back to the rule planner with an explicit message. Use `--planner rule` for deterministic offline demos.
+
+To smoke test the real LLM planner, set an API key and run:
+
+```bash
+OPENAI_API_KEY=your_api_key_here
+python examples/run_riskflow_agent_demo.py --planner llm --query "Check SA-CCR and SIMM readiness only." --show-plan
+```
 
 The default full scenario fetches live historical market data for the fixed
 window from `2023-01-01` through `2024-12-31`, as configured in
@@ -266,7 +287,7 @@ Representative Regulatory Risk readiness output:
 
 ## Limitations
 
-- Planning and routing are deterministic rather than LLM-directed.
+- LLM planning is constrained to JSON tool proposals and deterministic validation; malformed or unsupported plans do not execute.
 - Market risk is historical and focused on simple equity/ETF portfolios.
 - Only historical VaR is implemented; no parametric or Monte Carlo VaR is available.
 - Concentration observations are based on weights and ticker composition, not a formal factor model.
