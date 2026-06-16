@@ -7,7 +7,11 @@ from src.core.tool_registry import list_registered_tools
 from src.validators.regulatory import validate_regulatory_readiness_report
 from src.workflow.autonomous_planner import propose_autonomous_workflow_plan
 from src.workflow.engine import run_risk_workflow
-from src.workflow.plan_validator import validate_workflow_plan
+from src.workflow.llm_planner import (
+    is_llm_planner_available,
+    propose_llm_workflow_plan,
+)
+from src.workflow.plan_validator import PlanValidationResult, validate_workflow_plan
 from src.workflow.presentation import run_full_risk_agent_workflow
 from src.workflow.types import AgentWorkflowResult, WorkflowPlan
 
@@ -55,11 +59,15 @@ def run_agent_workflow(
     query: str | None = None,
     scenario: str = "full",
     proposed_plan: WorkflowPlan | None = None,
+    planner_mode: str = "auto",
+    planner_client=None,
 ) -> AgentWorkflowResult:
     """Run the policy-constrained autonomous planning workflow."""
     if scenario not in AGENT_SCENARIOS:
         supported = ", ".join(sorted(AGENT_SCENARIOS))
         raise ValueError(f"Unknown scenario '{scenario}'. Supported scenarios: {supported}.")
+    if planner_mode not in {"auto", "llm", "rule"}:
+        raise ValueError("planner_mode must be one of: auto, llm, rule.")
 
     scenario_config = AGENT_SCENARIOS[scenario]
     custom_query = query is not None
@@ -70,16 +78,26 @@ def run_agent_workflow(
         if custom_query
         else scenario_config.available_input_schemas
     )
-    registered_tool_names = [tool.name for tool in list_registered_tools()]
-    plan = proposed_plan or propose_autonomous_workflow_plan(
+    planning = _build_plan(
         effective_query,
-        available_input_schemas=available_input_schemas,
-        requested_modules=requested_modules,
-        registered_tool_names=registered_tool_names,
+        scenario,
+        available_input_schemas,
+        requested_modules,
+        proposed_plan,
+        planner_mode,
+        planner_client,
     )
+    plan = planning["plan"]
     plan_validation_result = validate_workflow_plan(plan)
     detected_modules = _detect_modules_from_plan(plan)
     execution_route = _execution_route_from_modules(detected_modules)
+
+    if planning["failed"]:
+        plan_validation_result = PlanValidationResult(
+            passed=False,
+            errors=[planning["message"]],
+            warnings=planning["warnings"],
+        )
 
     if not plan_validation_result.passed:
         return AgentWorkflowResult(
@@ -94,6 +112,9 @@ def run_agent_workflow(
             execution_trace=[],
             validation_result=None,
             raw_outputs={},
+            planner_mode=planning["mode"],
+            planner_message=planning["message"],
+            planner_warnings=planning["warnings"],
         )
 
     executed = _execute_approved_route(execution_route)
@@ -109,7 +130,107 @@ def run_agent_workflow(
         execution_trace=executed["execution_trace"],
         validation_result=executed["validation_result"],
         raw_outputs=executed["raw_outputs"],
+        planner_mode=planning["mode"],
+        planner_message=planning["message"],
+        planner_warnings=planning["warnings"],
     )
+
+
+def _build_plan(
+    effective_query: str,
+    scenario: str,
+    available_input_schemas: list[str],
+    requested_modules: list[str] | None,
+    proposed_plan: WorkflowPlan | None,
+    planner_mode: str,
+    planner_client,
+) -> dict:
+    if proposed_plan is not None:
+        return {
+            "plan": proposed_plan,
+            "mode": "provided",
+            "message": "Externally supplied plan with deterministic validation",
+            "warnings": [],
+            "failed": False,
+        }
+
+    registered_tools = list_registered_tools()
+    registered_tool_names = [tool.name for tool in registered_tools]
+
+    if planner_mode == "rule":
+        return _rule_planning_result(
+            effective_query,
+            available_input_schemas,
+            requested_modules,
+            registered_tool_names,
+            [],
+        )
+
+    if planner_mode == "auto" and planner_client is None and not is_llm_planner_available():
+        return _rule_planning_result(
+            effective_query,
+            available_input_schemas,
+            requested_modules,
+            registered_tool_names,
+            ["LLM planner unavailable; used rule-based fallback planner."],
+        )
+
+    try:
+        proposal = propose_llm_workflow_plan(
+            effective_query,
+            scenario=scenario,
+            available_input_schemas=available_input_schemas,
+            registered_tools=registered_tools,
+            client=planner_client,
+        )
+    except Exception as exc:
+        if planner_mode == "auto":
+            return _rule_planning_result(
+                effective_query,
+                available_input_schemas,
+                requested_modules,
+                registered_tool_names,
+                [f"LLM planner failed; used rule-based fallback planner. Reason: {exc}"],
+            )
+        return {
+            "plan": WorkflowPlan(
+                objective="Failed LLM-planned RiskFlow Agent workflow.",
+                steps=[],
+            ),
+            "mode": "llm",
+            "message": f"LLM planner failed before execution: {exc}",
+            "warnings": [],
+            "failed": True,
+        }
+
+    return {
+        "plan": proposal.plan,
+        "mode": "llm",
+        "message": "LLM planner with deterministic validation",
+        "warnings": proposal.planner_notes,
+        "failed": False,
+    }
+
+
+def _rule_planning_result(
+    effective_query: str,
+    available_input_schemas: list[str],
+    requested_modules: list[str] | None,
+    registered_tool_names: list[str],
+    warnings: list[str],
+) -> dict:
+    return {
+        "plan": propose_autonomous_workflow_plan(
+            effective_query,
+            available_input_schemas=available_input_schemas,
+            requested_modules=requested_modules,
+            registered_tool_names=registered_tool_names,
+        ),
+        "mode": "rule",
+        "message": "Rule-based fallback planner with deterministic validation",
+        "warnings": warnings,
+        "failed": False,
+    }
 
 
 def _execute_approved_route(route: str) -> dict:
@@ -220,7 +341,7 @@ def _detect_modules_from_plan(plan: WorkflowPlan) -> list[str]:
         modules.append("Credit Risk")
     if "assess_regulatory_readiness" in tool_names:
         modules.append("Regulatory Risk")
-    return modules or ["Market Risk"]
+    return modules
 
 
 def _execution_route_from_modules(modules: list[str]) -> str:

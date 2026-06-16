@@ -17,6 +17,49 @@ from src.workflow import (
 import src.workflow.agent as agent_module
 
 
+class _FakeResponse:
+    def __init__(self, output_text: str):
+        self.output_text = output_text
+
+
+class _FakeResponses:
+    def __init__(self, output_text: str):
+        self._output_text = output_text
+
+    def create(self, **kwargs):
+        return _FakeResponse(self._output_text)
+
+
+class _FakeLLMClient:
+    def __init__(self, output_text: str):
+        self.responses = _FakeResponses(output_text)
+
+
+class _RaisingResponses:
+    def create(self, **kwargs):
+        raise RuntimeError("network unavailable")
+
+
+class _RaisingLLMClient:
+    responses = _RaisingResponses()
+
+
+def _llm_payload(modules, tools):
+    import json
+
+    return json.dumps(
+        {
+            "detected_modules": modules,
+            "proposed_tools": [
+                {"tool_name": tool_name, "reason": f"Need {tool_name}."}
+                for tool_name in tools
+            ],
+            "rationale": "Mocked LLM plan.",
+            "planner_notes": [],
+        }
+    )
+
+
 def test_autonomous_planner_proposes_all_requested_risk_modules():
     plan = propose_autonomous_workflow_plan(
         "Run Market Risk, Credit Risk, and Regulatory Risk with stress testing.",
@@ -137,7 +180,7 @@ def test_run_agent_workflow_full_scenario(monkeypatch):
         ),
     )
 
-    result = run_agent_workflow(scenario="full")
+    result = run_agent_workflow(scenario="full", planner_mode="rule")
 
     assert isinstance(result, AgentWorkflowResult)
     assert result.scenario == "full"
@@ -206,7 +249,7 @@ def _credit_result():
 def test_run_agent_workflow_market_only_scenario(monkeypatch):
     monkeypatch.setattr(agent_module, "run_risk_workflow", lambda *args, **kwargs: _market_result())
 
-    result = run_agent_workflow(scenario="market")
+    result = run_agent_workflow(scenario="market", planner_mode="rule")
 
     assert result.detected_modules == ["Market Risk"]
     assert "Annualized volatility: 26.71%" in result.user_report
@@ -219,7 +262,7 @@ def test_run_agent_workflow_market_only_scenario(monkeypatch):
 def test_run_agent_workflow_credit_only_scenario(monkeypatch):
     monkeypatch.setattr(agent_module, "run_risk_workflow", lambda *args, **kwargs: _credit_result())
 
-    result = run_agent_workflow(scenario="credit")
+    result = run_agent_workflow(scenario="credit", planner_mode="rule")
 
     assert result.detected_modules == ["Credit Risk"]
     assert "Peak 95% PFE: USD 2,100,000.00" in result.user_report
@@ -230,7 +273,7 @@ def test_run_agent_workflow_credit_only_scenario(monkeypatch):
 
 
 def test_run_agent_workflow_regulatory_only_scenario():
-    result = run_agent_workflow(scenario="regulatory")
+    result = run_agent_workflow(scenario="regulatory", planner_mode="rule")
 
     assert result.detected_modules == ["Regulatory Risk"]
     assert "Regulatory Risk" in result.final_report_summary
@@ -243,6 +286,7 @@ def test_run_agent_workflow_custom_regulatory_query_overrides_full_scenario():
     result = run_agent_workflow(
         query="Check SA-CCR and SIMM readiness only.",
         scenario="full",
+        planner_mode="rule",
     )
 
     assert result.detected_modules == ["Regulatory Risk"]
@@ -277,6 +321,248 @@ def test_run_agent_workflow_invalid_plan_does_not_execute(monkeypatch):
     assert result.execution_trace == []
     assert result.raw_outputs == {}
     assert result.final_report_summary == "Approved Plan: none; execution was not started."
+
+
+def test_llm_planner_valid_market_plan(monkeypatch):
+    monkeypatch.setattr(agent_module, "run_risk_workflow", lambda *args, **kwargs: _market_result())
+    client = _FakeLLMClient(
+        _llm_payload(
+            ["Market Risk"],
+            [
+                "load_portfolio_file",
+                "validate_portfolio",
+                "load_risk_config",
+                "calculate_risk_metrics",
+                "retrieve_methodology",
+                "generate_commentary",
+                "validate_report",
+            ],
+        )
+    )
+
+    result = run_agent_workflow(scenario="market", planner_mode="llm", planner_client=client)
+
+    assert result.planner_mode == "llm"
+    assert result.planner_message == "LLM planner with deterministic validation"
+    assert result.detected_modules == ["Market Risk"]
+    assert result.plan_validation_result.passed is True
+    assert "Annualized volatility" in result.user_report
+
+
+def test_llm_planner_valid_credit_plan(monkeypatch):
+    monkeypatch.setattr(agent_module, "run_risk_workflow", lambda *args, **kwargs: _credit_result())
+    client = _FakeLLMClient(
+        _llm_payload(
+            ["Credit Risk"],
+            [
+                "load_portfolio_file",
+                "load_risk_config",
+                "calculate_pfe_metrics",
+                "retrieve_methodology",
+                "generate_commentary",
+                "validate_report",
+            ],
+        )
+    )
+
+    result = run_agent_workflow(scenario="credit", planner_mode="llm", planner_client=client)
+
+    assert result.planner_mode == "llm"
+    assert result.detected_modules == ["Credit Risk"]
+    assert result.plan_validation_result.passed is True
+    assert "Peak 95% PFE" in result.user_report
+
+
+def test_llm_planner_valid_regulatory_plan():
+    client = _FakeLLMClient(
+        _llm_payload(
+            ["Regulatory Risk"],
+            ["assess_regulatory_readiness"],
+        )
+    )
+
+    result = run_agent_workflow(
+        scenario="regulatory",
+        planner_mode="llm",
+        planner_client=client,
+    )
+
+    assert result.planner_mode == "llm"
+    assert result.detected_modules == ["Regulatory Risk"]
+    assert result.plan_validation_result.passed is True
+    assert "SA-CCR readiness" in result.user_report
+
+
+def test_llm_planner_valid_full_plan(monkeypatch):
+    monkeypatch.setattr(
+        agent_module,
+        "run_full_risk_agent_workflow",
+        lambda *args, **kwargs: SimpleNamespace(
+            user_report="Combined Executive Summary\nMarket Risk\nCredit Risk\nRegulatory Risk",
+            execution_trace=[],
+            validation_result={"passed": True},
+            raw_outputs={},
+        ),
+    )
+    client = _FakeLLMClient(
+        _llm_payload(
+            ["Market Risk", "Credit Risk", "Regulatory Risk"],
+            [
+                "load_portfolio_file",
+                "validate_portfolio",
+                "load_risk_config",
+                "calculate_risk_metrics",
+                "run_stress_test",
+                "calculate_pfe_metrics",
+                "assess_regulatory_readiness",
+                "retrieve_methodology",
+                "generate_commentary",
+                "validate_report",
+            ],
+        )
+    )
+
+    result = run_agent_workflow(scenario="full", planner_mode="llm", planner_client=client)
+
+    assert result.detected_modules == ["Market Risk", "Credit Risk", "Regulatory Risk"]
+    assert result.plan_validation_result.passed is True
+    assert "Combined Executive Summary" in result.user_report
+
+
+def test_llm_planner_rejects_unsupported_regulatory_capital_tool():
+    client = _FakeLLMClient(
+        _llm_payload(
+            ["Regulatory Risk"],
+            ["assess_regulatory_readiness", "calculate_saccr_capital"],
+        )
+    )
+
+    result = run_agent_workflow(scenario="regulatory", planner_mode="llm", planner_client=client)
+
+    assert result.plan_validation_result.passed is False
+    assert result.approved_plan is None
+    assert result.execution_trace == []
+    assert any(
+        "Unsupported regulatory capital" in error
+        for error in result.plan_validation_result.errors
+    )
+
+
+def test_llm_planner_rejects_unregistered_tool():
+    client = _FakeLLMClient(
+        _llm_payload(
+            ["Market Risk"],
+            ["load_portfolio_file", "calculate_magic_metric"],
+        )
+    )
+
+    result = run_agent_workflow(scenario="market", planner_mode="llm", planner_client=client)
+
+    assert result.plan_validation_result.passed is False
+    assert result.execution_trace == []
+    assert any("Unknown or unregistered tool" in error for error in result.plan_validation_result.errors)
+
+
+def test_malformed_llm_response_fails_safely_in_llm_mode():
+    result = run_agent_workflow(
+        scenario="market",
+        planner_mode="llm",
+        planner_client=_FakeLLMClient("not-json"),
+    )
+
+    assert result.planner_mode == "llm"
+    assert result.plan_validation_result.passed is False
+    assert result.execution_trace == []
+    assert "LLM planner failed before execution" in result.planner_message
+    assert result.detected_modules == []
+
+
+def test_llm_mode_failure_does_not_execute_tools(monkeypatch):
+    def fail_if_executed(*args, **kwargs):
+        raise AssertionError("Execution should not start after LLM planning failure.")
+
+    monkeypatch.setattr(agent_module, "run_full_risk_agent_workflow", fail_if_executed)
+    monkeypatch.setattr(agent_module, "run_risk_workflow", fail_if_executed)
+
+    result = run_agent_workflow(
+        scenario="full",
+        planner_mode="llm",
+        planner_client=_FakeLLMClient("not-json"),
+    )
+
+    assert result.plan_validation_result.passed is False
+    assert result.approved_plan is None
+    assert result.execution_trace == []
+
+
+def test_llm_client_exception_fails_safely_without_execution(monkeypatch):
+    def fail_if_executed(*args, **kwargs):
+        raise AssertionError("Execution should not start after LLM client failure.")
+
+    monkeypatch.setattr(agent_module, "run_full_risk_agent_workflow", fail_if_executed)
+    monkeypatch.setattr(agent_module, "run_risk_workflow", fail_if_executed)
+
+    result = run_agent_workflow(
+        scenario="full",
+        planner_mode="llm",
+        planner_client=_RaisingLLMClient(),
+    )
+
+    assert result.plan_validation_result.passed is False
+    assert result.approved_plan is None
+    assert result.execution_trace == []
+    assert result.detected_modules == []
+    assert "LLM planner failed before execution" in result.planner_message
+
+
+def test_auto_mode_falls_back_to_rule_planner_without_llm(monkeypatch):
+    monkeypatch.setattr(agent_module, "is_llm_planner_available", lambda: False)
+    monkeypatch.setattr(agent_module, "run_risk_workflow", lambda *args, **kwargs: _market_result())
+
+    result = run_agent_workflow(scenario="market", planner_mode="auto")
+
+    assert result.planner_mode == "rule"
+    assert "Rule-based fallback planner" in result.planner_message
+    assert result.planner_warnings == [
+        "LLM planner unavailable; used rule-based fallback planner."
+    ]
+
+
+def test_auto_mode_malformed_llm_fallback_uses_query_for_regulatory_route():
+    result = run_agent_workflow(
+        query="Check SA-CCR and SIMM readiness only.",
+        scenario="full",
+        planner_mode="auto",
+        planner_client=_FakeLLMClient("not-json"),
+    )
+
+    assert result.planner_mode == "rule"
+    assert result.detected_modules == ["Regulatory Risk"]
+    assert result.execution_trace[0]["tool_name"] == "assess_regulatory_readiness"
+    assert result.planner_warnings
+    assert result.planner_warnings[0].startswith(
+        "LLM planner failed; used rule-based fallback planner. Reason:"
+    )
+
+
+def test_query_overrides_scenario_in_llm_planner_mode():
+    client = _FakeLLMClient(
+        _llm_payload(
+            ["Regulatory Risk"],
+            ["assess_regulatory_readiness"],
+        )
+    )
+
+    result = run_agent_workflow(
+        query="Check SA-CCR and SIMM readiness only.",
+        scenario="full",
+        planner_mode="llm",
+        planner_client=client,
+    )
+
+    assert result.query == "Check SA-CCR and SIMM readiness only."
+    assert result.detected_modules == ["Regulatory Risk"]
+    assert result.execution_trace[0]["tool_name"] == "assess_regulatory_readiness"
 
 
 def _load_demo_module():
@@ -346,7 +632,63 @@ def test_autonomous_demo_full_plan_displays_credit_exposure_loading(
     assert len(displayed_steps) == 11
 
 
-def _fake_run_agent_workflow(query=None, scenario="full", proposed_plan=None):
+def test_primary_demo_llm_failure_does_not_display_stale_market_context(
+    monkeypatch,
+    capsys,
+):
+    module = _load_demo_module()
+    failed_plan = WorkflowPlan(
+        objective="Failed LLM-planned RiskFlow Agent workflow.",
+        steps=[],
+    )
+    failed_result = AgentWorkflowResult(
+        query="Check SA-CCR and SIMM readiness only.",
+        scenario="full",
+        detected_modules=[],
+        proposed_plan=failed_plan,
+        plan_validation_result=SimpleNamespace(
+            passed=False,
+            errors=["LLM planner failed before execution: malformed JSON."],
+            warnings=[],
+        ),
+        approved_plan=None,
+        user_report=None,
+        final_report_summary="Approved Plan: none; execution was not started.",
+        execution_trace=[],
+        validation_result=None,
+        raw_outputs={},
+        planner_mode="llm",
+        planner_message="LLM planner failed before execution: malformed JSON.",
+        planner_warnings=[],
+    )
+    monkeypatch.setattr(module, "run_agent_workflow", lambda **kwargs: failed_result)
+
+    module.main(
+        [
+            "--planner",
+            "llm",
+            "--query",
+            "Check SA-CCR and SIMM readiness only.",
+            "--show-plan",
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert "Requested modules: unavailable because planning failed" in output
+    assert "Available input schemas: unavailable because planning failed" in output
+    assert "Plan validation: FAILED" in output
+    assert "Approved Plan: none; execution was not started." in output
+    assert "Requested modules: Market Risk" not in output
+    assert "Available input schemas: market_portfolio" not in output
+
+
+def _fake_run_agent_workflow(
+    query=None,
+    scenario="full",
+    proposed_plan=None,
+    planner_mode="auto",
+    planner_client=None,
+):
     scenario_config = AGENT_SCENARIOS[scenario]
     effective_query = query or scenario_config.query
     plan = proposed_plan or propose_autonomous_workflow_plan(

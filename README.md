@@ -1,8 +1,10 @@
 # RiskFlow Agent
 
-RiskFlow Agent is an agentic financial risk workflow demo built around deterministic Python analytics. It combines explicit workflow planning, registered tool execution, runtime tracing, local methodology retrieval, LLM or deterministic commentary, and a validation gate.
+RiskFlow Agent is an agentic financial risk workflow demo built around deterministic Python analytics. It combines LLM-assisted workflow planning, registered tool execution, runtime tracing, local methodology retrieval, LLM or deterministic commentary, and validation gates.
 
-The project supports market-risk, counterparty-exposure, and regulatory-readiness workflows through one orchestration and presentation layer. Risk calculations remain authoritative; generated commentary explains supplied results and is checked against them before the workflow returns.
+The project supports market-risk, counterparty-exposure, and regulatory-readiness workflows through one orchestration and presentation layer. LLMs may propose plans and write commentary, but deterministic Python tools calculate risk metrics and validators approve execution and output.
+
+**LLM plans. Python tools calculate. Validators gate execution and output.**
 
 This is an engineering and analytics demonstration, not a production risk platform or investment advisory system.
 
@@ -10,15 +12,17 @@ This is an engineering and analytics demonstration, not a production risk platfo
 
 RiskFlow Agent does more than call an LLM from a script. The workflow makes planning and execution explicit:
 
-- A deterministic planner builds the expected sequence of steps.
+- The primary planner can use an LLM to propose a workflow from the user request, available schemas, and registered tools.
+- A deterministic rule planner remains available as fallback/offline mode.
 - A tool registry exposes named shared, market-risk, and credit-risk capabilities.
 - `ToolExecutor` invokes registered handlers and returns structured results.
 - An execution trace records actual tool calls, statuses, inputs, outputs, and errors.
 - Data schema detection routes market portfolios and exposure profiles through different analytical paths.
 - Commentary is grounded in calculated results and retrieved methodology.
-- A validation gate checks numerical consistency and policy guardrails, with one controlled commentary retry when required.
+- A deterministic plan validator must approve proposed tool sequences before execution.
+- A report validation gate checks numerical consistency and policy guardrails, with one controlled commentary retry when required.
 
-The current planner is rule-based. The LLM does not autonomously select tools or calculate risk metrics.
+The LLM planner cannot execute tools, calculate VaR, ES, PFE, SA-CCR, SIMM, RegIM, capital, margin, or bypass validation. Unsupported or misordered tool plans are rejected before execution.
 
 ## Supported Workflows
 
@@ -80,7 +84,10 @@ Optional exposure fields: pfe_99, currency, counterparty
 query + data_file + config_file
               |
               v
-     deterministic workflow plan
+ LLM or rule-based workflow plan
+              |
+              v
+ deterministic plan validation
               |
               v
      registered tool execution
@@ -188,6 +195,7 @@ python examples/run_riskflow_agent_demo.py
 The primary demo is a thin wrapper around `src.workflow.run_agent_workflow()`.
 It defaults to `--scenario full` and supports:
 
+- `--planner auto | llm | rule`
 - `--scenario full | market | credit | regulatory`
 - `--query "custom user request"`
 - `--show-plan` to display the approved tool sequence
@@ -196,6 +204,8 @@ It defaults to `--scenario full` and supports:
 ```bash
 python examples/run_riskflow_agent_demo.py --scenario market --show-plan
 ```
+
+`--planner auto` uses LLM planning when an API key is available and otherwise falls back to the rule planner with an explicit message. Use `--planner rule` for deterministic offline demos.
 
 The default full scenario fetches live historical market data for the fixed
 window from `2023-01-01` through `2024-12-31`, as configured in

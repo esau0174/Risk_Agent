@@ -17,7 +17,11 @@ DEFAULT_TRACE_FILE = "logs/riskflow_agent_trace.json"
 
 def main(argv: list[str] | None = None) -> None:
     args = _parse_args(argv)
-    result = run_agent_workflow(query=args.query, scenario=args.scenario)
+    result = run_agent_workflow(
+        query=args.query,
+        scenario=args.scenario,
+        planner_mode=args.planner,
+    )
 
     print("RiskFlow Agent Demo")
     print("===================")
@@ -27,13 +31,11 @@ def main(argv: list[str] | None = None) -> None:
     print()
     print("Input Context")
     print(f"- Scenario: {result.scenario}")
-    print(f"- Requested modules: {', '.join(result.detected_modules)}")
-    print(
-        "- Available input schemas: "
-        f"{', '.join(_available_input_schemas(result.detected_modules)) or 'none'}"
-    )
+    print(f"- Requested modules: {_requested_modules_text(result)}")
+    print(f"- Available input schemas: {_available_input_schemas_text(result)}")
     print()
     print("Autonomous Planning Summary")
+    print(f"- Planner: {result.planner_message}")
     approved_tool_count = (
         len(_display_steps(result.approved_plan, result.scenario))
         if result.approved_plan is not None
@@ -48,6 +50,8 @@ def main(argv: list[str] | None = None) -> None:
         print("- Errors: " + "; ".join(result.plan_validation_result.errors))
     if result.plan_validation_result.warnings:
         print("- Warnings: " + "; ".join(result.plan_validation_result.warnings))
+    if result.planner_warnings:
+        print("- Planner warnings: " + "; ".join(result.planner_warnings))
     print()
 
     if not result.plan_validation_result.passed:
@@ -117,6 +121,18 @@ def _available_input_schemas(detected_modules: list[str]) -> list[str]:
     return schemas
 
 
+def _requested_modules_text(result) -> str:
+    if not result.detected_modules and not result.approved_plan:
+        return "unavailable because planning failed"
+    return ", ".join(result.detected_modules) or "none"
+
+
+def _available_input_schemas_text(result) -> str:
+    if not result.detected_modules and not result.approved_plan:
+        return "unavailable because planning failed"
+    return ", ".join(_available_input_schemas(result.detected_modules)) or "none"
+
+
 def _validation_summary(validation_result) -> str:
     if validation_result is None:
         return "- Validation: NOT_RUN"
@@ -137,6 +153,12 @@ def _validation_summary(validation_result) -> str:
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run the primary RiskFlow Agent autonomous workflow demo."
+    )
+    parser.add_argument(
+        "--planner",
+        choices=("auto", "llm", "rule"),
+        default="auto",
+        help="Planner mode. Auto uses LLM planning when available, otherwise rule fallback.",
     )
     parser.add_argument(
         "--scenario",

@@ -2,19 +2,23 @@
 
 ## Project Goal
 
-RiskFlow Agent is a risk analytics application that combines deterministic Python calculations with controlled LLM commentary. It accepts an analysis instruction, structured or natural-language portfolio input, and optional calculation configuration. The system produces market-risk or counterparty-exposure results, retrieves local methodology notes, generates commentary, and validates the resulting report.
+RiskFlow Agent is a risk analytics application that combines LLM-assisted planning with deterministic Python calculations and controlled commentary. It accepts an analysis instruction, structured or natural-language portfolio input, and optional calculation configuration. The system proposes a workflow, validates the proposed tool sequence, executes deterministic analytics, retrieves local methodology notes, generates commentary, and validates the resulting report.
 
-The calculations remain authoritative. The LLM explains calculated results; it does not calculate or replace them.
+The calculations remain authoritative. The LLM may plan and explain, but it does not calculate or replace risk metrics.
 
 ## High-Level Design
 
-RiskFlow Agent separates deterministic workflow orchestration from domain analytics. Shared tools route structured inputs into market-risk, credit-risk, or regulatory-readiness modules, local methodology retrieval grounds commentary, and deterministic validators enforce numerical and policy guardrails. A presentation layer produces a clean user report while retaining raw analytics, validation results, and an auditable execution trace.
+RiskFlow Agent separates planning, deterministic workflow orchestration, domain analytics, and validation. The primary planner can use an LLM to propose registered tools from the user query and input context, while the rule planner remains the fallback/offline mode. Shared tools route structured inputs into market-risk, credit-risk, or regulatory-readiness modules, local methodology retrieval grounds commentary, and deterministic validators enforce numerical and policy guardrails. A presentation layer produces a clean user report while retaining raw analytics, validation results, and an auditable execution trace.
+
+**LLM plans. Python tools calculate. Validators gate execution and output.**
 
 ## Why This Is an Agentic Workflow
 
 The application is not a single prompt or linear script. `src/workflow/` provides an explicit planning and execution layer:
 
-- `planner.py` builds deterministic workflow plans, detects the loaded-data route, and infers active modules.
+- `llm_planner.py` asks an LLM to propose a JSON-like workflow plan from the user query, input schemas, supported modules, and registered tools.
+- `autonomous_planner.py` provides the deterministic rule planner used for fallback/offline mode.
+- `planner.py` builds deterministic route plans, detects the loaded-data route, and infers active modules for the execution engine.
 - `engine.py` orchestrates the selected route and owns the high-level execution sequence.
 - `execution.py` invokes tools through `ToolExecutor` and records concise runtime trace entries.
 - `types.py` defines plans, steps, route results, presentation results, and execution trace records.
@@ -22,9 +26,9 @@ The application is not a single prompt or linear script. `src/workflow/` provide
 
 Each capability is registered as a named tool. Planned steps and actual tool calls are separately inspectable through `WorkflowPlan` and `execution_trace`. Commentary is validated after generation, with one controlled regeneration attempt when validation fails.
 
-Planning is deterministic. The current workflow does not use an LLM to choose tools or dynamically create execution paths.
+LLM-proposed plans cannot execute directly. `plan_validator.py` rejects unknown tools, unsupported regulatory capital/margin tools, and misordered plans before execution. The LLM is not allowed to calculate VaR, Expected Shortfall, PFE, SA-CCR, SIMM, RegIM, capital, margin, or any risk number.
 
-The recommended project entry point is `examples/run_riskflow_agent_demo.py`. It is a thin wrapper around `src.workflow.run_agent_workflow()`, which proposes a workflow from the user query, available schemas, requested modules, and registered tool names, validates the proposed tool sequence, and then delegates to the deterministic execution path. Older demos are archived under `examples/legacy/`.
+The recommended project entry point is `examples/run_riskflow_agent_demo.py`. It is a thin wrapper around `src.workflow.run_agent_workflow()`, which supports `planner_mode="auto" | "llm" | "rule"`. In `auto` mode the workflow uses the LLM planner when available and otherwise falls back clearly to the rule planner. Older demos are archived under `examples/legacy/`.
 
 ## Input Model
 
@@ -173,7 +177,7 @@ Validation preserves deterministic check ordering and returns structured checks,
 
 ## Presentation And Trace Serialization
 
-`src/workflow/presentation.py` converts the market and credit `WorkflowResult` objects into an `AgentRunResult`. The primary user-facing demo is `examples/run_riskflow_agent_demo.py`, which calls `run_agent_workflow()` and supports `--scenario full|market|credit|regulatory`, `--query`, `--show-plan`, and `--trace-file`. Passing `--trace-file` writes the internal `execution_trace` to JSON while stdout remains presentation-oriented.
+`src/workflow/presentation.py` converts the market and credit `WorkflowResult` objects into an `AgentRunResult`. The primary user-facing demo is `examples/run_riskflow_agent_demo.py`, which calls `run_agent_workflow()` and supports `--planner auto|llm|rule`, `--scenario full|market|credit|regulatory`, `--query`, `--show-plan`, and `--trace-file`. Passing `--trace-file` writes the internal `execution_trace` to JSON while stdout remains presentation-oriented.
 
 Failure behavior is demonstrated separately under `examples/failure_cases/`:
 
@@ -184,7 +188,7 @@ These presentation scripts call existing workflow and validation APIs; they do n
 
 ## Current Limitations
 
-- Workflow planning and routing are deterministic, not LLM-directed.
+- LLM planning is constrained to proposing registered tools and depends on API availability; rule planning remains the offline fallback.
 - Market risk relies on historical price data and currently supports equity/ETF-style holdings.
 - VaR uses the historical method; no parametric or Monte Carlo VaR is implemented.
 - Stress testing uses simple ticker-specific proxy shocks, not a formal factor or full revaluation model.

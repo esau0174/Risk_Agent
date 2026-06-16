@@ -26,6 +26,9 @@ class AgentWorkflowResult:
     execution_trace: list[dict]
     validation_result: object | None
     raw_outputs: dict
+    planner_mode: str = "rule"
+    planner_message: str = "Rule-based planner with deterministic validation"
+    planner_warnings: list[str] | None = None
 
 
 @dataclass
