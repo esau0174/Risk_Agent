@@ -131,9 +131,26 @@ def _build_user_report(
                 + ", ".join(regulatory_result["sa_ccr"]["missing_required_fields"])
             ),
             (
+                "- SIMM / RegIM available inputs: "
+                + (
+                    ", ".join(regulatory_result["simm_regim"].get("available_inputs", []))
+                    or "none"
+                )
+            ),
+            (
                 "- SIMM / RegIM missing inputs: "
                 + ", ".join(
-                    regulatory_result["simm_regim"]["missing_required_fields"]
+                    regulatory_result["simm_regim"].get(
+                        "missing_inputs",
+                        regulatory_result["simm_regim"]["missing_required_fields"],
+                    )
+                )
+            ),
+            (
+                "- SIMM / RegIM guardrail: "
+                + regulatory_result["simm_regim"].get(
+                    "guardrail_note",
+                    regulatory_result["guardrail"],
                 )
             ),
             f"- Guardrail: {regulatory_result['guardrail']}",

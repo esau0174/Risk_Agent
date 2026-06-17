@@ -701,15 +701,24 @@ def _build_sensitivity_report(result: dict) -> str:
 
 
 def _build_regulatory_report(readiness: dict, validation_result=None) -> str:
+    simm_regim = readiness["simm_regim"]
+    simm_available = simm_regim.get("available_inputs", [])
+    simm_missing = simm_regim.get(
+        "missing_inputs",
+        simm_regim.get("missing_required_fields", []),
+    )
     lines = [
         "Regulatory Risk",
         f"- SA-CCR readiness: {readiness['sa_ccr']['status']}",
-        f"- SIMM / RegIM readiness: {readiness['simm_regim']['status']}",
+        f"- SIMM / RegIM readiness: {simm_regim['status']}",
         f"- Regulatory capital calculation: {readiness['regulatory_capital_calculation']}",
         "- SA-CCR missing inputs: "
         f"{', '.join(readiness['sa_ccr']['missing_required_fields'])}",
+        "- SIMM / RegIM available inputs: "
+        f"{', '.join(simm_available) if simm_available else 'none'}",
         "- SIMM / RegIM missing inputs: "
-        f"{', '.join(readiness['simm_regim']['missing_required_fields'])}",
+        f"{', '.join(simm_missing)}",
+        f"- SIMM / RegIM guardrail: {simm_regim.get('guardrail_note', readiness['guardrail'])}",
         f"- Guardrail: {readiness['guardrail']}",
     ]
     if validation_result is not None:

@@ -16,9 +16,10 @@ def validate_regulatory_readiness_report(
     text = report_text or ""
     missing_inputs = readiness_result.get("missing_inputs", [])
 
+    supported_statuses = {"READY", "PARTIAL", "WARNING", "NOT_READY"}
     structured_status = (
-        readiness_result.get("sa_ccr", {}).get("status") in {"READY", "WARNING"}
-        and readiness_result.get("simm_regim", {}).get("status") in {"READY", "WARNING"}
+        readiness_result.get("sa_ccr", {}).get("status") in supported_statuses
+        and readiness_result.get("simm_regim", {}).get("status") in supported_statuses
     )
     checks.append(
         ValidationCheck(
@@ -77,7 +78,12 @@ def validate_regulatory_readiness_report(
 def _contains_unsupported_capital_or_margin_number(text: str) -> bool:
     for segment in re.split(r"(?:[.!?;\n])", text):
         lower_segment = segment.lower()
-        if "not performed" in lower_segment or "no regulatory capital number" in lower_segment:
+        if (
+            "not performed" in lower_segment
+            or "no regulatory capital number" in lower_segment
+            or "no regulatory capital or margin number" in lower_segment
+            or "no simm margin amount is generated" in lower_segment
+        ):
             continue
         if not re.search(r"\b(?:capital|margin|regim)\b", lower_segment):
             continue

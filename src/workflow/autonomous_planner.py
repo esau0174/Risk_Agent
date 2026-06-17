@@ -70,9 +70,6 @@ def propose_autonomous_workflow_plan(
             selected_tools.append("load_risk_config")
         selected_tools.append("calculate_pfe_metrics")
 
-    if "regulatory_risk" in modules:
-        selected_tools.append("assess_regulatory_readiness")
-
     if "sensitivity_risk" in modules:
         selected_tools.extend(
             [
@@ -81,6 +78,9 @@ def propose_autonomous_workflow_plan(
                 "aggregate_greeks",
             ]
         )
+
+    if "regulatory_risk" in modules:
+        selected_tools.append("assess_regulatory_readiness")
 
     if any(module in modules for module in ("market_risk", "credit_risk")):
         selected_tools.extend(

@@ -118,7 +118,8 @@ def test_full_workflow_returns_structured_agent_run_result(monkeypatch):
     assert "SIMM / RegIM readiness: WARNING" in result.user_report
     assert "Regulatory capital calculation: Not performed" in result.user_report
     assert "SA-CCR missing inputs: trade_type, notional" in result.user_report
-    assert "SIMM / RegIM missing inputs: risk_factor_sensitivities" in result.user_report
+    assert "SIMM / RegIM available inputs: none" in result.user_report
+    assert "SIMM / RegIM missing inputs: risk_class" in result.user_report
     assert "Validation: PASSED" in result.user_report
     assert len(result.execution_trace) == 5
     assert all(isinstance(entry, dict) for entry in result.execution_trace)

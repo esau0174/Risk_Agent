@@ -67,20 +67,7 @@ def main(argv: list[str] | None = None) -> None:
         _print_plan(result.approved_plan, scenario=result.scenario)
         print()
 
-    print("Execution Trace")
-    print(f"- Execution mode: {result.orchestration_trace.get('execution_mode', 'unknown')}")
-    print(f"- Selected route: {result.orchestration_trace.get('selected_route') or 'none'}")
-    executed_tools = result.orchestration_trace.get("executed_tools") or []
-    skipped_tools = result.orchestration_trace.get("skipped_or_unsupported_tools") or []
-    print(f"- Executed tools: {', '.join(executed_tools) if executed_tools else 'none'}")
-    print(
-        "- Skipped / unsupported tools: "
-        f"{', '.join(skipped_tools) if skipped_tools else 'none'}"
-    )
-    route_mapping_note = result.orchestration_trace.get("route_mapping_note")
-    if route_mapping_note:
-        print(f"- Route mapping note: {route_mapping_note}")
-    print()
+    _print_execution_trace_summary(result.orchestration_trace)
 
     print("Risk Report")
     print(result.user_report or result.final_report_summary)
@@ -107,6 +94,30 @@ def save_execution_trace(result, trace_file: str | Path) -> Path:
         encoding="utf-8",
     )
     return path
+
+
+def _print_execution_trace_summary(orchestration_trace: dict) -> None:
+    print("Execution Trace")
+    print(f"- Execution mode: {orchestration_trace.get('execution_mode', 'unknown')}")
+    print(f"- Selected route: {orchestration_trace.get('selected_route') or 'none'}")
+    executed_tools = orchestration_trace.get("executed_tools") or []
+    skipped_tools = orchestration_trace.get("skipped_or_unsupported_tools") or []
+    print("- Executed tools:")
+    if executed_tools:
+        for tool_name in executed_tools:
+            print(f"  - {tool_name}")
+    else:
+        print("  - none")
+    print("- Skipped / unsupported tools:")
+    if skipped_tools:
+        for tool_name in skipped_tools:
+            print(f"  - {tool_name}")
+    else:
+        print("  - none")
+    route_mapping_note = orchestration_trace.get("route_mapping_note")
+    if route_mapping_note:
+        print(f"- Route mapping note: {route_mapping_note}")
+    print()
 
 
 def _print_plan(plan, scenario: str) -> None:

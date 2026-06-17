@@ -40,10 +40,13 @@ class FakeToolExecutor:
                 },
                 "simm_regim": {
                     "status": "WARNING",
-                    "missing_required_fields": ["risk_factor_sensitivities"],
+                    "available_inputs": [],
+                    "missing_inputs": ["risk_class"],
+                    "missing_required_fields": ["risk_class"],
+                    "guardrail_note": "No SIMM margin amount is generated.",
                 },
                 "regulatory_capital_calculation": "Not performed",
-                "guardrail": "No regulatory capital number was generated from insufficient inputs",
+                "guardrail": "No regulatory capital or margin number was generated from insufficient inputs.",
             },
         }[tool_name]
         return ToolResult(tool_name=tool_name, status="success", output=output)

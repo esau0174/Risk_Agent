@@ -11,7 +11,9 @@ def test_assess_regulatory_readiness_reports_missing_fields():
     assert result["sa_ccr"]["status"] == "WARNING"
     assert "notional" in result["sa_ccr"]["missing_required_fields"]
     assert result["simm_regim"]["status"] == "WARNING"
-    assert "risk_factor_sensitivities" in result["missing_inputs"]
+    assert "risk_class" in result["missing_inputs"]
+    assert "product_class" in result["simm_regim"]["missing_inputs"]
+    assert result["simm_regim"]["available_inputs"] == []
     assert result["regulatory_capital_calculation"] == "Not performed"
 
 
@@ -23,11 +25,19 @@ def test_assess_regulatory_readiness_can_be_ready_when_required_inputs_exist():
             "maturity": 5,
             "asset_class": "rates",
             "supervisory_category": "interest_rate",
-            "risk_factor_sensitivities": {"USD": 1000},
-            "margin_class": "rates",
-            "product_class": "rates_fx",
-            "risk_factor_type": "delta",
+            "risk_class": "rates",
+            "risk_factor": "USD 10Y",
+            "bucket": "USD Rates",
+            "delta": 1000,
+            "gamma": 10,
+            "vega": 500,
+            "theta": -25,
             "currency": "USD",
+            "product_class": "rates_fx",
+            "margin_class": "rates",
+            "risk_weight_mapping": {"USD 10Y": 1.0},
+            "correlation_parameters": {"rates": 0.5},
+            "margin_currency": "USD",
         }
     )
 
@@ -35,6 +45,35 @@ def test_assess_regulatory_readiness_can_be_ready_when_required_inputs_exist():
     assert result["simm_regim"]["status"] == "READY"
     assert result["overall_status"] == "READY"
     assert result["missing_inputs"] == []
+
+
+def test_assess_regulatory_readiness_uses_supplied_sensitivity_fields():
+    result = assess_regulatory_readiness(
+        {
+            "precomputed_sensitivities": "available",
+            "sensitivity_fields": [
+                "risk_class",
+                "risk_factor",
+                "bucket",
+                "delta",
+                "gamma",
+                "vega",
+                "theta",
+                "currency",
+            ],
+        }
+    )
+
+    assert result["simm_regim"]["status"] == "PARTIAL"
+    assert "risk_class" in result["simm_regim"]["available_inputs"]
+    assert "delta" in result["simm_regim"]["available_inputs"]
+    assert "risk_class" not in result["simm_regim"]["missing_inputs"]
+    assert "product_class" in result["simm_regim"]["missing_inputs"]
+    assert "margin_class" in result["simm_regim"]["missing_inputs"]
+    assert "risk_weight_mapping" in result["simm_regim"]["missing_inputs"]
+    assert "correlation_parameters" in result["simm_regim"]["missing_inputs"]
+    assert "margin_currency" in result["simm_regim"]["missing_inputs"]
+    assert "No SIMM margin amount is generated" in result["simm_regim"]["guardrail_note"]
 
 
 def test_regulatory_readiness_is_registered_tool():

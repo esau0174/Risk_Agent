@@ -176,6 +176,35 @@ def test_run_agent_workflow_market_and_greeks_query_routes_both_modules():
     assert "Sensitivity Risk" in result.user_report
 
 
+def test_run_agent_workflow_market_greeks_and_regulatory_uses_sensitivity_readiness():
+    result = run_agent_workflow(
+        query="Run market risk, Greeks, and regulatory readiness.",
+        scenario="full",
+        planner_mode="rule",
+    )
+
+    assert result.detected_modules == [
+        "Market Risk",
+        "Regulatory Risk",
+        "Sensitivity Risk",
+    ]
+    executed_tools = result.orchestration_trace["executed_tools"]
+    assert executed_tools.index("aggregate_greeks") < executed_tools.index(
+        "assess_regulatory_readiness"
+    )
+    assert "Market Risk" in result.user_report
+    assert "Sensitivity Risk" in result.user_report
+    assert "Regulatory Risk" in result.user_report
+    assert "SIMM / RegIM readiness: PARTIAL" in result.user_report
+    assert "SIMM / RegIM available inputs:" in result.user_report
+    assert "risk_class" in result.user_report
+    assert "delta" in result.user_report
+    assert "product_class" in result.user_report
+    assert "No SIMM margin amount is generated" in result.user_report
+    assert "SIMM margin amount: USD" not in result.user_report
+    assert result.raw_outputs["regulatory_risk"]["simm_regim"]["status"] == "PARTIAL"
+
+
 def test_plan_validator_accepts_valid_autonomous_plan():
     plan = propose_autonomous_workflow_plan(
         "Run Market Risk, Credit Risk, and Regulatory Risk with stress testing.",
@@ -247,6 +276,33 @@ def test_plan_validator_rejects_misordered_tools():
     )
 
 
+def test_plan_validator_requires_sensitivity_aggregation_before_regulatory_readiness():
+    plan = WorkflowPlan(
+        objective="Invalid sensitivity regulatory order.",
+        steps=[
+            WorkflowStep(
+                name="assess_regulatory_readiness",
+                description="Assess readiness too early.",
+                status="proposed",
+                tool_name="assess_regulatory_readiness",
+            ),
+            WorkflowStep(
+                name="aggregate_greeks",
+                description="Aggregate sensitivities too late.",
+                status="proposed",
+                tool_name="aggregate_greeks",
+            ),
+        ],
+    )
+
+    result = validate_workflow_plan(plan)
+
+    assert result.passed is False
+    assert "aggregate_greeks must occur before assess_regulatory_readiness." in (
+        result.errors
+    )
+
+
 def test_run_agent_workflow_full_scenario(monkeypatch):
     class FakeApprovedPlanExecutor:
         def can_execute(self, plan, context):
@@ -279,10 +335,12 @@ def test_run_agent_workflow_full_scenario(monkeypatch):
                     "maturity",
                     "asset_class",
                     "supervisory_category",
-                    "risk_factor_sensitivities",
+                    "risk_class",
                     "margin_class",
                     "product_class",
-                    "risk_factor_type",
+                    "risk_weight_mapping",
+                    "correlation_parameters",
+                    "margin_currency",
                     "currency",
                 ],
                 "sa_ccr": {
@@ -297,16 +355,41 @@ def test_run_agent_workflow_full_scenario(monkeypatch):
                 },
                 "simm_regim": {
                     "status": "WARNING",
-                    "missing_required_fields": [
-                        "risk_factor_sensitivities",
-                        "margin_class",
-                        "product_class",
-                        "risk_factor_type",
+                    "available_inputs": [],
+                    "missing_inputs": [
+                        "risk_class",
+                        "risk_factor",
+                        "bucket",
+                        "delta",
+                        "gamma",
+                        "vega",
+                        "theta",
                         "currency",
+                        "product_class",
+                        "margin_class",
+                        "risk_weight_mapping",
+                        "correlation_parameters",
+                        "margin_currency",
                     ],
+                    "missing_required_fields": [
+                        "risk_class",
+                        "risk_factor",
+                        "bucket",
+                        "delta",
+                        "gamma",
+                        "vega",
+                        "theta",
+                        "currency",
+                        "product_class",
+                        "margin_class",
+                        "risk_weight_mapping",
+                        "correlation_parameters",
+                        "margin_currency",
+                    ],
+                    "guardrail_note": "No SIMM margin amount is generated.",
                 },
                 "regulatory_capital_calculation": "Not performed",
-                "guardrail": "No regulatory capital number was generated from insufficient inputs",
+                "guardrail": "No regulatory capital or margin number was generated from insufficient inputs.",
             }
             context.market_commentary = (
                 "Historical VaR and Expected Shortfall describe downside risk for "
@@ -851,11 +934,37 @@ def test_autonomous_demo_full_plan_displays_credit_exposure_loading(
     assert "Execution Trace" in output
     assert "- Execution mode:" in output
     assert "- Executed tools:" in output
-    assert "- Skipped / unsupported tools: none" in output
+    assert "- Skipped / unsupported tools:" in output
+    assert "  - none" in output
     displayed_steps = [
         line for line in output.splitlines() if line[:1].isdigit() and ". " in line
     ]
     assert len(displayed_steps) == 11
+
+
+def test_execution_trace_summary_keeps_executed_and_skipped_labels_on_separate_lines(
+    capsys,
+):
+    module = _load_demo_module()
+
+    module._print_execution_trace_summary(
+        {
+            "execution_mode": "approved_plan_executor",
+            "selected_route": "full",
+            "executed_tools": [
+                "load_portfolio_file",
+                "validate_portfolio",
+                "calculate_risk_metrics",
+                "validate_report",
+            ],
+            "skipped_or_unsupported_tools": [],
+            "route_mapping_note": "Approved plan executed directly.",
+        }
+    )
+
+    output = capsys.readouterr().out
+    assert "validate_report\n- Skipped / unsupported tools:" in output
+    assert "validate_report- Skipped / unsupported tools" not in output
 
 
 def test_primary_demo_llm_failure_does_not_display_stale_market_context(

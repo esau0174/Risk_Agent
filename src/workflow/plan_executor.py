@@ -225,6 +225,20 @@ def _assess_regulatory_readiness(
         "historical_market_data": "available" if context.risk_report else None,
         "exposure_profile": "available" if context.exposure_profile else None,
     }
+    if context.sensitivity_records is not None:
+        inputs["precomputed_sensitivities"] = "available"
+        inputs["sensitivity_fields"] = [
+            "risk_class",
+            "risk_factor",
+            "bucket",
+            "delta",
+            "gamma",
+            "vega",
+            "theta",
+            "currency",
+        ]
+    if context.sensitivity_result is not None:
+        inputs["sensitivity_result"] = "available"
     context.regulatory_readiness = executor._run_tool(
         "assess_regulatory_readiness",
         inputs,
