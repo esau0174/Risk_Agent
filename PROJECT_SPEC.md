@@ -1,228 +1,180 @@
-# RiskFlow Agent Project Spec
+# RiskFlow Agent v1 Project Spec
 
-> Historical phase-1 spec. The current RiskFlow Agent architecture is documented in
-> [docs/architecture.md](docs/architecture.md). This file is retained for development
-> history and should not be read as the current implementation scope.
+RiskFlow Agent is a controlled LLM-assisted risk workflow agent for Market Risk,
+Credit Risk / PFE, Sensitivity Risk / Greeks aggregation, and Regulatory Readiness.
 
-## Project Name
+**LLM plans and comments. Python tools calculate. Validators gate execution and output.**
 
-RiskFlow Agent
+Historical Phase 1 planning notes have been moved to
+`docs/project_history.md`. This file describes the current v1 implementation scope.
 
-## Project Goal
+## Goal
 
-Build an LLM-powered financial risk analyst agent that can parse natural-language portfolio risk questions, invoke Python-based risk analytics tools, retrieve methodology notes, and generate analyst-style risk reports with assumptions and limitations.
+Demonstrate controlled agentic workflow orchestration for financial risk analytics:
 
-The project should demonstrate:
+- Convert a natural-language request into an approved tool plan.
+- Validate that plan before execution.
+- Execute deterministic Python analytics tools.
+- Retrieve local methodology notes.
+- Generate LLM or deterministic commentary grounded in calculated outputs.
+- Validate generated reports for numerical consistency and guardrails.
+- Preserve execution trace, validation results, and raw analytics outputs.
 
-- Financial risk analytics
-- Python engineering
-- LLM tool calling
-- Retrieval-Augmented Generation
-- Explainable financial reporting
-- Guardrails against unsupported investment advice
+## Current Workflows
 
-## Target User
+### Market Risk
 
-A financial analyst, risk analyst, or portfolio manager who wants to quickly understand the downside risk, concentration risk, and stress exposure of a simple equity/ETF portfolio.
+Inputs:
 
-## Phase 1 Goal
+- Structured market portfolio file with `ticker` and `weight`.
+- Optional metadata: `portfolio_id`, `book`, `asset_class`, `risk_bucket`,
+  `region`, and `notional_usd`.
+- Risk configuration including market data dates, VaR confidence level, enabled
+  metrics, stress scenarios, and reporting settings.
 
-Build the non-LLM risk analytics backend.
+Outputs:
 
-Phase 1 should accept tickers and weights, download historical market data, compute portfolio returns, and calculate core risk metrics.
+- Portfolio metadata and total notional when supplied.
+- Annualized volatility.
+- Historical VaR.
+- Expected Shortfall.
+- Maximum drawdown.
+- Dollarized VaR, Expected Shortfall, drawdown, and stress loss when notional is available.
+- Deterministic stress scenario loss and stressed portfolio value.
 
-Example input:
+### Credit Risk / PFE
 
-tickers = ["SPY", "QQQ", "NVDA", "TLT"]
-weights = [0.4, 0.3, 0.2, 0.1]
-start_date = "2023-01-01"
-end_date = None
-confidence_level = 0.95
+Inputs:
 
-Expected outputs:
+- Exposure profile file with `netting_set`, `time_years`,
+  `expected_exposure`, and `pfe_95`.
+- Optional `pfe_99`, `currency`, and `counterparty`.
+- Optional configured credit limits by netting set.
 
-- Daily asset returns
-- Daily portfolio returns
-- Cumulative portfolio return
-- Annualized volatility
-- Historical VaR
-- Expected Shortfall
-- Maximum drawdown
-- Correlation matrix
+Outputs:
 
-## Phase 1 Files
+- Peak 95% PFE and time of peak.
+- Peak 99% PFE when supplied.
+- EPE / average expected exposure.
+- Maximum expected exposure.
+- Largest netting set by peak PFE.
+- Limit utilization and status: `PASSED`, `WARNING`, or `BREACHED`.
 
-src/
-  market_data.py
-  portfolio.py
-  risk_metrics.py
-  stress_testing.py
+### Sensitivity Risk / Greeks
 
-tests/
-  test_portfolio.py
-  test_risk_metrics.py
+Inputs:
 
-## Module Requirements
+- Precomputed sensitivity file with `portfolio_id`, `book`, `trade_id`,
+  `instrument_type`, `risk_class`, `risk_factor`, `bucket`, `delta`, `gamma`,
+  `vega`, `theta`, and `currency`.
 
-### market_data.py
+Outputs:
 
-Implement:
+- Schema validation for supplied sensitivities.
+- Total delta, gamma, vega, and theta.
+- Absolute delta by risk class.
+- Absolute vega by bucket.
+- Largest delta and vega risk-factor concentrations.
+- Currency consistency warnings when multiple currencies are present.
 
-download_price_data(tickers, start_date, end_date=None)
+Boundary:
 
-Requirements:
+- RiskFlow Agent consumes Greeks from an upstream pricing or risk engine.
+- It does not calculate pricing-model Greeks.
 
-- Use yfinance.
-- Return adjusted close price data as a pandas DataFrame.
-- Columns should be ticker symbols.
-- Drop rows where all prices are missing.
-- Raise a clear error if no data is returned.
-- Support a single ticker and multiple tickers.
+### Regulatory Readiness
 
-### portfolio.py
+Inputs:
 
-Implement:
+- Available workflow context from market portfolios, exposure profiles, and
+  sensitivity files.
 
-validate_weights(tickers, weights)
-calculate_asset_returns(price_data)
-calculate_portfolio_returns(asset_returns, weights)
-calculate_cumulative_returns(portfolio_returns)
+Outputs:
 
-Requirements:
+- SA-CCR readiness status and missing trade-level inputs.
+- Available portfolio-level metadata such as portfolio notional and asset class.
+- SIMM / RegIM readiness status, available inputs, and missing inputs.
+- Explicit guardrail that no regulatory capital or margin number is generated.
 
-- Number of tickers must equal number of weights.
-- Weights must sum to 1 within a small tolerance.
-- Weights should be converted to a numpy array.
-- Asset returns should use daily percentage returns.
-- Portfolio returns should be the weighted sum of asset returns.
-- Cumulative return should be calculated as `(1 + returns).cumprod() - 1`.
+Boundary:
 
-### risk_metrics.py
-
-Implement:
-
-annualized_volatility(returns, trading_days=252)
-historical_var(returns, confidence_level=0.95)
-expected_shortfall(returns, confidence_level=0.95)
-max_drawdown(cumulative_returns)
-correlation_matrix(asset_returns)
-
-Definitions:
-
-- Annualized volatility = daily standard deviation x sqrt(252).
-- Historical VaR should return a positive loss number.
-- For 95% VaR, use the 5th percentile of returns.
-- Expected Shortfall should return the average loss beyond the VaR threshold as a positive number.
-- Max drawdown should return positive loss magnitude.
-
-Preferred convention:
-
-- VaR returns positive loss magnitude.
-- Expected Shortfall returns positive loss magnitude.
-- Max drawdown returns positive loss magnitude.
-
-### stress_testing.py
-
-Implement simple scenario analysis later.
-
-For Phase 1, this can be a placeholder.
-
-Future functions:
-
-apply_shock_to_returns(asset_returns, shocks)
-run_historical_stress_scenario(portfolio_returns, scenario_start, scenario_end)
-
-## Testing Requirements
-
-Use pytest.
-
-Tests should cover:
-
-- Weight length mismatch
-- Weights not summing to 1
-- Correct portfolio return calculation
-- Historical VaR sign convention
-- Expected Shortfall sign convention
-- Max drawdown calculation
-
-## Phase 2 Preview
-
-After Phase 1 works, build an LLM tool-calling layer.
-
-The LLM should:
-
-- Parse natural-language portfolio descriptions.
-- Extract tickers and weights.
-- Decide which risk tools to call.
-- Generate a structured risk report.
-- Include assumptions and limitations.
-
-Example user query:
-
-Analyze a portfolio with 40% SPY, 30% QQQ, 20% NVDA, and 10% TLT. Focus on downside risk and concentration risk.
-
-## Phase 3 Preview
-
-Add RAG methodology notes.
-
-Create markdown docs for:
-
-- Historical VaR
-- Expected Shortfall
-- Stress Testing
-- Concentration Risk
-- Model Limitations
-
-The agent should retrieve relevant notes and cite them in its explanation.
-
-## Guardrails
-
-The agent should not provide direct buy/sell recommendations.
-
-It can provide:
-
-- Risk analysis
-- Exposure analysis
-- Historical scenario analysis
-- Methodology explanation
-- Limitations
-
-It should avoid:
-
-- Promising returns
-- Claiming predictions are certain
-- Recommending specific trades as personalized financial advice
-
-## Phase 1 Implementation Prompt for Codex
-
-You are working in the repository D:\Code\Risk_Agent.
-
-Read PROJECT_SPEC.md first.
-
-Implement Phase 1 only.
-
-Create clean, tested Python modules:
-
-- src/market_data.py
-- src/portfolio.py
-- src/risk_metrics.py
-- src/stress_testing.py
-
-Also implement pytest tests:
-
-- tests/test_portfolio.py
-- tests/test_risk_metrics.py
-
-Do not implement the LLM agent yet.
-Do not implement Streamlit yet.
-Focus on the risk analytics backend.
-
-Follow the conventions in PROJECT_SPEC.md:
-
-- VaR returns positive loss magnitude.
-- Expected Shortfall returns positive loss magnitude.
-- Max drawdown returns positive loss magnitude.
-- Validate portfolio weights carefully.
-- Use clear error messages.
-
-After implementation, run pytest and fix any failing tests.
+- No real SA-CCR EAD calculation.
+- No SIMM or RegIM margin calculation.
+- No regulatory capital stack.
+
+## Agent Architecture
+
+```text
+natural-language request
+  -> planner
+  -> plan validator
+  -> approved tool registry
+  -> approved-plan executor
+  -> deterministic analytics tools
+  -> methodology retrieval
+  -> commentary generation
+  -> report validation
+  -> user report + execution trace
+```
+
+The approved-plan executor is the preferred execution path. It runs validated
+registered tools sequentially using explicit context adapters. If a validated
+plan cannot be directly mapped, the system can fall back to conservative
+deterministic routes and records that fallback in the orchestration trace.
+
+## Tool And Validation Model
+
+Registered tools cover:
+
+- Data loading and parsing.
+- Portfolio validation.
+- Market risk calculation.
+- Stress testing.
+- PFE calculation.
+- Sensitivity file loading, validation, and aggregation.
+- Regulatory readiness assessment.
+- Methodology retrieval.
+- Commentary generation and regeneration.
+- Report validation.
+
+Validators enforce:
+
+- Portfolio weight validity.
+- Positive-loss conventions for VaR, Expected Shortfall, and drawdown.
+- Dollar metric consistency against notional.
+- Stress and PFE numerical consistency.
+- Sensitivity workflow status in combined validation summaries.
+- Regulatory readiness structure and no fabricated capital or margin numbers.
+- No direct investment recommendations.
+- Methodology grounding.
+
+## Primary Demo
+
+Use the primary entry point:
+
+```bash
+python examples/run_riskflow_agent_demo.py --planner rule --scenario full --show-plan
+```
+
+Additional supported demo paths:
+
+```bash
+python examples/run_riskflow_agent_demo.py --planner rule --query "Run market risk, Greeks review, and regulatory readiness." --show-plan
+python examples/run_riskflow_agent_demo.py --planner rule --query "Check SIMM readiness using Greeks sensitivities." --show-plan
+python examples/failure_cases/run_invalid_portfolio_demo.py
+python examples/failure_cases/run_report_validation_failure_demo.py
+```
+
+Older focused demos are archived under `examples/legacy/` and are not the
+recommended review entry point.
+
+## Scope Boundaries
+
+- No real SA-CCR EAD calculation.
+- No real SIMM or RegIM margin calculation.
+- No Monte Carlo PFE generation.
+- No pricing-model Greeks calculation.
+- No XVA valuation, PD/LGD/EAD modeling, or regulatory capital stack.
+- No investment advice.
+- No unrestricted autonomous tool execution.
+- No production deployment or distributed scheduler.
