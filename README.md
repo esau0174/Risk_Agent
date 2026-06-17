@@ -20,32 +20,20 @@ RiskFlow Agent is not a single portfolio VaR script. It separates autonomous pla
 
 ## Agent Architecture
 
-```text
-Natural-language request + input context
-        |
-        v
-Planner: LLM planner or rule fallback
-        |
-        v
-Plan validator
-        |
-        v
-Approved tool registry + ToolExecutor
-        |
-        v
-Deterministic execution
-        |
-        v
-Risk analytics + methodology retrieval
-        |
-        v
-Commentary generation
-        |
-        v
-Report validation / guardrails
-        |
-        v
-User report + execution trace + raw outputs
+```mermaid
+flowchart TD
+    A[Natural-language request + input context] --> B[Planner: LLM or rule fallback]
+    B --> C[Plan validator]
+    C -->|approved| D[Approved tool registry]
+    C -->|failed| F[Fail safe: no execution, validation errors returned]
+    D --> E[Approved-plan executor]
+    E --> G[Deterministic Python tools]
+    G --> H[Risk analytics outputs]
+    H --> I[Methodology retrieval]
+    I --> J[Commentary generation]
+    J --> K[Report validators]
+    K -->|passed| L[User report + execution trace + raw outputs]
+    K -->|failed| M[Controlled regeneration or validation failure]
 ```
 
 Canonical package structure:
@@ -138,6 +126,14 @@ The primary entry point is `examples/run_riskflow_agent_demo.py`. Older focused 
 ## Optional LLM Usage
 
 The project works offline with `--planner rule`. With `--planner auto`, RiskFlow Agent uses the LLM planner when an API key is available and falls back clearly to the rule planner when it is not. With `--planner llm`, missing or malformed LLM planning fails safely before execution.
+
+### LLM Planner Demo
+
+Use `--planner rule` for reproducible offline demos. Use `--planner auto` or `--planner llm` to demonstrate LLM-driven planning when an API key is available:
+
+```bash
+python examples/run_riskflow_agent_demo.py --planner auto --query "Review market risk, Greeks exposure, and SIMM readiness." --show-plan
+```
 
 Project-root `.env` example:
 

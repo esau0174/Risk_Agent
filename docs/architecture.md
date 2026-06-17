@@ -55,6 +55,40 @@ Without `data_file`, the query is parsed for market portfolio tickers and weight
 
 The workflow begins by resolving the input source and constructing a plan. Structured files are loaded through registered data-loading tools. The planner then routes by requested modules and available schemas.
 
+```mermaid
+flowchart TD
+    A[Planner / router] --> B[Market Risk]
+    A --> C[Credit Risk / PFE]
+    A --> D[Sensitivity Risk / Greeks]
+    A --> E[Regulatory Readiness]
+
+    B --> B1[VaR / ES / drawdown]
+    B --> B2[Dollar metrics]
+    B --> B3[Deterministic stress testing]
+
+    C --> C1[PFE / EPE]
+    C --> C2[Netting set concentration]
+    C --> C3[Limit utilization]
+
+    D --> D1[Consume precomputed Greeks]
+    D --> D2[Validate sensitivity schema]
+    D --> D3[Aggregate Greeks and concentration]
+    D --> E
+
+    E --> E1[SA-CCR input completeness]
+    E --> E2[SIMM / RegIM readiness]
+
+    B1 --> V[Report validators]
+    B2 --> V
+    B3 --> V
+    C1 --> V
+    C2 --> V
+    C3 --> V
+    D3 --> V
+    E1 --> V
+    E2 --> V
+```
+
 Market-risk execution is:
 
 ```text
