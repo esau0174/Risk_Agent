@@ -46,7 +46,7 @@ def _fake_generate_portfolio_risk_report(
 def test_build_risk_workflow_plan_returns_expected_steps():
     plan = build_risk_workflow_plan("40% SPY, 60% QQQ")
 
-    assert plan.objective == "Analyze portfolio risk from a natural-language query."
+    assert plan.objective == "Analyze a risk workflow from a natural-language query."
     assert [step.name for step in plan.steps] == [
         "parse_portfolio",
         "validate_portfolio",

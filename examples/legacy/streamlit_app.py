@@ -16,7 +16,7 @@ def main() -> None:
     st.set_page_config(page_title="RiskFlow Agent", page_icon="📊", layout="wide")
 
     st.title("RiskFlow Agent")
-    st.subheader("LLM-Powered Portfolio Risk Analyst")
+    st.subheader("Controlled Risk Workflow Analyst")
 
     query = st.text_area(
         "Portfolio query",
@@ -30,7 +30,7 @@ def main() -> None:
             return
 
         try:
-            with st.spinner("Analyzing portfolio risk..."):
+            with st.spinner("Running RiskFlow analysis..."):
                 result = analyze_portfolio_query_with_llm(query)
         except Exception as exc:
             st.error(f"Unable to analyze portfolio: {exc}")

@@ -28,7 +28,7 @@ def generate_portfolio_risk_report(
     risk_config: RiskConfig | None = None,
     portfolio_metadata: dict | None = None,
 ) -> dict:
-    """Generate a high-level Phase 1 portfolio risk report."""
+    """Generate deterministic market risk metrics for a portfolio."""
     ticker_list = list(tickers)
     weight_list = [float(weight) for weight in weights]
 

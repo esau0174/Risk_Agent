@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from pathlib import Path
 
 import pandas as pd
 import yfinance as yf
+
+
+_YFINANCE_CACHE_DIR = Path(".cache") / "yfinance"
 
 
 def download_price_data(
@@ -19,6 +23,8 @@ def download_price_data(
 
     if not ticker_list:
         raise ValueError("At least one ticker is required.")
+
+    _configure_yfinance_cache()
 
     data = yf.download(
         ticker_list if len(ticker_list) > 1 else ticker_list[0],
@@ -51,3 +57,10 @@ def download_price_data(
 
     prices.columns = [str(column) for column in prices.columns]
     return prices
+
+
+def _configure_yfinance_cache() -> None:
+    """Use a workspace-local yfinance cache to avoid user-profile cache failures."""
+    _YFINANCE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    if hasattr(yf, "set_tz_cache_location"):
+        yf.set_tz_cache_location(str(_YFINANCE_CACHE_DIR))

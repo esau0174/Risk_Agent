@@ -276,7 +276,7 @@ def regenerate_risk_commentary_with_validation_errors(
             {
                 "role": "system",
                 "content": (
-                    "Revise the supplied portfolio risk commentary so it resolves every "
+                    "Revise the supplied market risk commentary so it resolves every "
                     "validation error and warning. Use only the supplied calculated facts and "
                     "retrieved methodology notes. Do not invent metrics or citations, make "
                     "investment recommendations, or claim guaranteed outcomes. Preserve clear "

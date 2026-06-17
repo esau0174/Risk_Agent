@@ -8,7 +8,7 @@ These scripts are earlier RiskFlow Agent demonstrations retained for reference:
 - `run_credit_risk_demo.py`: focused credit-risk workflow display.
 - `run_phase1_demo.py`: direct Phase 1 market-risk analytics.
 - `run_text_query_demo.py`: rule-based natural-language portfolio parsing and market-risk reporting.
-- `streamlit_app.py`: archived Streamlit prototype from the earlier portfolio-only agent flow.
+- `streamlit_app.py`: archived Streamlit prototype from an earlier portfolio-focused UI flow.
 
 The current primary demo lives at `examples/run_riskflow_agent_demo.py`.
 

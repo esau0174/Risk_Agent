@@ -65,7 +65,7 @@ def build_workflow_plan_for_intent(intent: Intent) -> WorkflowPlan:
 
     if intent is Intent.PORTFOLIO_RISK:
         return WorkflowPlan(
-            objective="Analyze portfolio risk from a natural-language query.",
+            objective="Analyze a risk workflow from a natural-language query.",
             steps=[
                 registered_step("parse_portfolio"),
                 registered_step("validate_portfolio"),
