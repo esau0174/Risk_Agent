@@ -1,6 +1,6 @@
 # RiskFlow Agent
 
-Controlled LLM-assisted risk workflow agent for Market Risk, Credit Risk / PFE, Sensitivity Risk / Greeks aggregation, and Regulatory Readiness.
+Controlled LLM-assisted risk workflow agent for Market Risk, Counterparty Risk, Sensitivity Risk, and Regulatory Risk.
 
 **LLM plans and comments. Python tools calculate. Validators gate execution and output.**
 
@@ -42,9 +42,9 @@ Canonical package structure:
 - `src/data/`: portfolio parsing, structured file loading, market data.
 - `src/workflow/`: planners, plan validation, approved-plan executor, orchestration types.
 - `src/market_risk/`: historical market-risk analytics and stress testing.
-- `src/credit_risk/`: counterparty exposure / PFE analytics.
-- `src/sensitivity_risk/`: precomputed Greeks loading, validation, and aggregation.
-- `src/regulatory_risk/`: SA-CCR and SIMM / RegIM readiness checks.
+- `src/credit_risk/`: Counterparty Risk analytics focused on PFE, EPE, netting sets, and limits.
+- `src/sensitivity_risk/`: Sensitivity Risk analytics using precomputed Greeks.
+- `src/regulatory_risk/`: Regulatory Risk readiness checks for SA-CCR and SIMM / RegIM inputs.
 - `src/knowledge/`: local methodology retrieval.
 - `src/reporting/`: commentary and report formatting utilities.
 - `src/validators/`: numerical, methodology, regulatory, and guardrail validation.
@@ -62,7 +62,7 @@ See [docs/architecture.md](docs/architecture.md) for more implementation detail.
 - Dollarized VaR, Expected Shortfall, drawdown, and stress loss when notional is available.
 - Deterministic stress testing with simple equity, technology, and rates shocks.
 
-**Credit Risk / PFE**
+**Counterparty Risk**
 
 - Counterparty exposure profile validation.
 - Peak 95% and 99% PFE.
@@ -70,7 +70,7 @@ See [docs/architecture.md](docs/architecture.md) for more implementation detail.
 - Netting set concentration.
 - Optional limit utilization by netting set with `PASSED`, `WARNING`, or `BREACHED` status.
 
-**Sensitivity Risk / Greeks**
+**Sensitivity Risk**
 
 - Consumes precomputed Greeks from an upstream pricing or risk engine.
 - Validates sensitivity-file schema.
@@ -79,7 +79,7 @@ See [docs/architecture.md](docs/architecture.md) for more implementation detail.
 - Reports currency consistency warnings when applicable.
 - Does not calculate pricing-model Greeks.
 
-**Regulatory Readiness**
+**Regulatory Risk**
 
 - SA-CCR and SIMM / RegIM input-completeness checks.
 - Distinguishes portfolio-level metadata from missing trade-level SA-CCR inputs.
@@ -102,10 +102,16 @@ Run the finalized v1 demo with the deterministic rule planner:
 python examples/run_riskflow_agent_demo.py --planner rule --scenario full --show-plan
 ```
 
-Run a Market Risk + Greeks + Regulatory Readiness workflow:
+The same workflow is available through the installed CLI:
 
 ```bash
-python examples/run_riskflow_agent_demo.py --planner rule --query "Run market risk, Greeks review, and regulatory readiness." --show-plan
+riskflow-agent --planner rule --scenario full --show-plan
+```
+
+Run a Market Risk + Sensitivity Risk + Regulatory Risk workflow:
+
+```bash
+python examples/run_riskflow_agent_demo.py --planner rule --query "Run market risk, sensitivity risk, and regulatory risk review." --show-plan
 ```
 
 Run a SIMM readiness workflow using Greeks sensitivities:
@@ -123,16 +129,58 @@ python examples/failure_cases/run_report_validation_failure_demo.py
 
 The primary entry point is `examples/run_riskflow_agent_demo.py`. Older focused demos are archived under `examples/legacy/`; reviewers should use the primary entry point rather than the archived legacy demos.
 
+## CLI Usage
+
+After `pip install -e ".[dev]"`, the console command is:
+
+```bash
+riskflow-agent --planner rule --scenario full --show-plan
+```
+
+Supported core arguments mirror the primary demo wrapper:
+
+- `--planner auto | llm | rule`
+- `--scenario full | market | credit | regulatory`
+- `--query "custom request"`
+- `--show-plan`
+- `--trace-file [path]`
+
+Example:
+
+```bash
+riskflow-agent --planner rule --query "Run market risk, sensitivity risk, and regulatory risk review." --show-plan
+```
+
+## Use As A Python Library
+
+The public package facade exposes the main workflow entry points:
+
+```python
+from riskflow_agent import run_agent_workflow, run_risk_workflow
+
+result = run_agent_workflow(
+    query="Run market risk, sensitivity risk, and regulatory risk review.",
+    planner_mode="rule",
+)
+
+print(result.user_report)
+```
+
 ## Optional LLM Usage
 
-The project works offline with `--planner rule`. With `--planner auto`, RiskFlow Agent uses the LLM planner when an API key is available and falls back clearly to the rule planner when it is not. With `--planner llm`, missing or malformed LLM planning fails safely before execution.
+Planner modes:
+
+- `--planner rule` is the reproducible offline path.
+- `--planner auto` uses the LLM planner when an API key is available and falls back clearly to rule planning otherwise.
+- `--planner llm` requires an API key and fails safely before execution if the key is unavailable or the LLM response is malformed.
+- Commentary also has a deterministic fallback when LLM generation is unavailable.
 
 ### LLM Planner Demo
 
 Use `--planner rule` for reproducible offline demos. Use `--planner auto` or `--planner llm` to demonstrate LLM-driven planning when an API key is available:
 
 ```bash
-python examples/run_riskflow_agent_demo.py --planner auto --query "Review market risk, Greeks exposure, and SIMM readiness." --show-plan
+python examples/run_riskflow_agent_demo.py --planner auto --query "Run market risk, sensitivity risk, and regulatory risk review." --show-plan
 ```
 
 Project-root `.env` example:
@@ -159,7 +207,7 @@ The v1 demo uses sample files under `examples/`:
 
 - `sample_portfolio.csv`: institutional-style market holdings with metadata and notional.
 - `sample_exposure_profile.csv`: counterparty exposure profile for PFE analytics.
-- `sample_sensitivities.csv`: precomputed Greeks for sensitivity aggregation and SIMM / RegIM readiness.
+- `sample_sensitivities.csv`: precomputed Greeks for Sensitivity Risk aggregation and SIMM / RegIM readiness.
 - `sample_risk_config.json`: fixed market data window, VaR settings, stress scenario, and credit limits.
 
 The market-data lookback window is fixed from `2023-01-01` to `2024-12-31` for more reproducible demo output. Prices are still fetched live, so small data-source revisions may slightly change reported metrics.
@@ -186,16 +234,16 @@ RiskFlow Agent includes expected failure paths:
 - Regulatory readiness reports missing inputs rather than fabricating capital or margin numbers.
 - Commentary must not provide investment advice.
 
-## Interview Framing
+## Engineering Highlights
 
-Use this project to discuss controlled autonomy in financial risk systems:
+RiskFlow Agent highlights controlled autonomy patterns for financial risk systems:
 
 - The planner provides agentic workflow selection.
 - The tool registry defines the allowed action space.
 - The executor runs deterministic Python tools, not arbitrary model-generated code.
 - Validators act as gates before and after execution.
 - The execution trace makes the workflow auditable and reproducible.
-- Regulatory workflows are readiness screens only, intentionally avoiding false claims of capital or margin calculation.
+- Regulatory Risk workflows are readiness screens only, intentionally avoiding false claims of capital or margin calculation.
 
 This maps well to AI-enabled quant developer work: orchestration, tool use, deterministic analytics, validation guardrails, and explainable risk reporting.
 

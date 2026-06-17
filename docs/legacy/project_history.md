@@ -23,9 +23,9 @@ RiskFlow Agent v1 implementation.
 RiskFlow Agent has since expanded into a controlled LLM-assisted workflow agent:
 
 - Market Risk analytics with portfolio metadata, dollarized risk metrics, and deterministic stress testing.
-- Credit Risk / PFE analytics with exposure profiles, EPE, netting set concentration, and limit utilization.
-- Sensitivity Risk / Greeks aggregation from precomputed upstream sensitivities.
-- Regulatory Readiness checks for SA-CCR and SIMM / RegIM input completeness.
+- Counterparty Risk analytics with exposure profiles, EPE, netting set concentration, and limit utilization.
+- Sensitivity Risk aggregation from precomputed upstream Greeks.
+- Regulatory Risk readiness checks for SA-CCR and SIMM / RegIM input completeness.
 - Planner, tool registry, approved-plan executor, execution trace, methodology retrieval, commentary, and validators.
 
 The current implementation remains deliberately bounded: it does not calculate

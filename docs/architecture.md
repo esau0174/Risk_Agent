@@ -2,7 +2,7 @@
 
 ## Project Goal
 
-RiskFlow Agent is a risk analytics application that combines LLM-assisted planning with deterministic Python calculations and controlled commentary. It accepts an analysis instruction, structured or natural-language portfolio input, and optional calculation configuration. The system proposes a workflow, validates the proposed tool sequence, executes deterministic analytics, retrieves local methodology notes, generates commentary, and validates the resulting report.
+RiskFlow Agent is a risk analytics application that combines LLM-assisted planning with deterministic Python calculations and controlled commentary. It accepts an analysis instruction, supported structured inputs, and optional calculation configuration. The system proposes a workflow, validates the proposed tool sequence, executes deterministic analytics, retrieves local methodology notes, generates commentary, and validates the resulting report.
 
 The calculations remain authoritative. The LLM may plan and explain, but it does not calculate or replace risk metrics.
 
@@ -58,9 +58,9 @@ The workflow begins by resolving the input source and constructing a plan. Struc
 ```mermaid
 flowchart TD
     A[Planner / router] --> B[Market Risk]
-    A --> C[Credit Risk / PFE]
-    A --> D[Sensitivity Risk / Greeks]
-    A --> E[Regulatory Readiness]
+    A --> C[Counterparty Risk]
+    A --> D[Sensitivity Risk]
+    A --> E[Regulatory Risk]
 
     B --> B1[VaR / ES / drawdown]
     B --> B2[Dollar metrics]
@@ -102,7 +102,7 @@ load or parse portfolio
   -> validate report
 ```
 
-Credit Risk execution is:
+Counterparty Risk execution is:
 
 ```text
 load exposure profile
@@ -113,7 +113,7 @@ load exposure profile
   -> validate report
 ```
 
-The market route skips PFE analytics. The credit route skips portfolio-weight validation, historical market-risk calculations, and market stress testing. Both routes return `WorkflowResult` and use the same orchestration engine, execution tracing, commentary generation, and validation gate.
+The market route skips PFE analytics. The counterparty route skips portfolio-weight validation, historical market-risk calculations, and market stress testing. Both routes return `WorkflowResult` and use the same orchestration engine, execution tracing, commentary generation, and validation gate.
 
 Sensitivity Risk execution is:
 
@@ -125,7 +125,7 @@ load sensitivity file
 
 The sensitivity workflow consumes precomputed delta, gamma, vega, and theta values from an upstream pricing or risk engine. It does not calculate pricing-model Greeks.
 
-Regulatory Readiness execution is:
+Regulatory Risk execution is:
 
 ```text
 assess regulatory readiness
@@ -134,7 +134,7 @@ assess regulatory readiness
 
 When sensitivity data is available, SIMM / RegIM readiness recognizes supplied fields such as risk class, risk factor, bucket, Greeks, and currency. Missing inputs still include items outside the current scope, such as product class, margin class, risk-weight mappings, correlation parameters, and margin currency.
 
-The primary agent workflow can combine Market Risk, Credit Risk, Sensitivity Risk, and Regulatory Readiness sections and returns `AgentWorkflowResult`:
+The primary agent workflow can combine Market Risk, Counterparty Risk, Sensitivity Risk, and Regulatory Risk sections and returns `AgentWorkflowResult`:
 
 - `user_report`: presentation-ready final risk summary.
 - `execution_trace`: serialized, auditable tool and workflow steps.
@@ -150,11 +150,11 @@ The canonical implementation is organized into the following packages:
 - `src/core/`: tool registry, tool execution, and risk configuration.
 - `src/data/`: portfolio loading and parsing, portfolio calculations, and market data access.
 - `src/workflow/`: planning, routing, orchestration, execution tracing, and workflow result types.
-- `src/validators/`: market, stress, credit/PFE, regulatory, methodology, and commentary guardrail validation.
+- `src/validators/`: market, stress, counterparty/PFE, regulatory, methodology, and commentary guardrail validation.
 - `src/market_risk/`: historical market-risk metrics, report assembly, and deterministic stress testing.
-- `src/credit_risk/`: counterparty exposure and PFE summary analytics.
+- `src/credit_risk/`: Counterparty Risk analytics focused on PFE, EPE, netting sets, and limits.
 - `src/sensitivity_risk/`: supplied Greeks validation and aggregation.
-- `src/regulatory_risk/`: SA-CCR and SIMM / RegIM readiness screening.
+- `src/regulatory_risk/`: Regulatory Risk readiness screening for SA-CCR and SIMM / RegIM inputs.
 - `src/knowledge/`: local methodology loading and keyword-based retrieval.
 - `src/reporting/`: LLM and fallback commentary generation plus report formatting utilities.
 
@@ -174,7 +174,7 @@ Supporting shared capabilities are separated by responsibility:
 - `src/reporting/agent.py` builds prompts and produces LLM or deterministic fallback commentary.
 - `src/reporting/report_generator.py` contains report formatting utilities.
 
-The registry includes input adapters, market calculations, credit/PFE calculations, sensitivity aggregation, regulatory readiness, methodology retrieval, commentary generation/regeneration, and report validation. It is an in-process Python registry, not a remote tool protocol or OpenAI tool-calling implementation.
+The registry includes input adapters, market calculations, Counterparty Risk / PFE calculations, sensitivity aggregation, regulatory readiness, methodology retrieval, commentary generation/regeneration, and report validation. It is an in-process Python registry, not a remote tool protocol or OpenAI tool-calling implementation.
 
 ## Market Risk Module
 
@@ -186,7 +186,7 @@ The registry includes input adapters, market calculations, credit/PFE calculatio
 
 Market prices are downloaded by `src/data/market_data.py`; portfolio return calculations and weight validation live in `src/data/portfolio.py`.
 
-## Credit Risk Module
+## Counterparty Risk Module
 
 `src/credit_risk/counterparty_risk.py` calculates summary analytics from a supplied exposure profile:
 
@@ -217,11 +217,11 @@ The module does not calculate Black-Scholes Greeks, Monte Carlo Greeks, or any p
 
 For SA-CCR, the readiness screen distinguishes portfolio-level metadata, such as portfolio notional and asset class, from missing trade-level regulatory inputs, such as trade type, trade notional, maturity, supervisory category, netting agreement details, and supervisory factor/category mapping.
 
-For SIMM / RegIM, the readiness screen can use supplied sensitivity fields from the Greeks workflow, while still reporting missing model and regulatory inputs such as product class, margin class, risk-weight mapping, correlation parameters, and margin currency.
+For SIMM / RegIM, the readiness screen can use supplied sensitivity fields from the Sensitivity Risk workflow, while still reporting missing model and regulatory inputs such as product class, margin class, risk-weight mapping, correlation parameters, and margin currency.
 
 It does not calculate SA-CCR EAD, SA-CCR capital, SIMM margin, or RegIM margin.
 
-The full demo includes this readiness screen as a third high-level section and validates that no regulatory capital or margin number is fabricated when required inputs are missing.
+The full demo includes Regulatory Risk as a high-level section and validates that no regulatory capital or margin number is fabricated when required inputs are missing.
 
 ## Methodology Retrieval
 

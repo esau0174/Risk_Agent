@@ -6,7 +6,7 @@ Credit Risk / PFE, Sensitivity Risk / Greeks aggregation, and Regulatory Readine
 **LLM plans and comments. Python tools calculate. Validators gate execution and output.**
 
 Historical Phase 1 planning notes have been moved to
-`docs/project_history.md`. This file describes the current v1 implementation scope.
+`docs/legacy/project_history.md`. This file describes the current v1 implementation scope.
 
 ## Goal
 

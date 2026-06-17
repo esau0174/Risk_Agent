@@ -22,9 +22,12 @@ dev = [
     "pytest",
 ]
 
+[project.scripts]
+riskflow-agent = "riskflow_agent.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["src", "src.*"]
+include = ["src", "src.*", "riskflow_agent", "riskflow_agent.*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
