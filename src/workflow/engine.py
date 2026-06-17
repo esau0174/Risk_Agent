@@ -113,6 +113,7 @@ def run_risk_workflow(
         )
 
     tickers = parsed_portfolio["tickers"]
+    portfolio_metadata = parsed_portfolio.get("metadata")
     validated_weights = execute_traced(
         executor,
         execution_trace,
@@ -124,6 +125,8 @@ def run_risk_workflow(
     )
     weights = validated_weights.tolist()
     parsed_portfolio = {"tickers": tickers, "weights": weights}
+    if portfolio_metadata:
+        parsed_portfolio["metadata"] = portfolio_metadata
     complete_step(
         plan,
         "validate_portfolio",
@@ -152,6 +155,10 @@ def run_risk_workflow(
     if risk_config.stress_scenarios:
         insert_step_after(plan, "calculate_risk_metrics", "run_stress_test")
 
+    risk_report_kwargs = {}
+    if portfolio_metadata:
+        risk_report_kwargs["portfolio_metadata"] = portfolio_metadata
+
     risk_report = execute_traced(
         executor,
         execution_trace,
@@ -168,6 +175,7 @@ def run_risk_workflow(
         start_date=risk_config.market_data.start_date,
         end_date=risk_config.market_data.end_date,
         risk_config=risk_config,
+        **risk_report_kwargs,
     )
     metric_names = ", ".join(risk_report["risk_metrics"].keys())
     complete_step(
@@ -178,6 +186,11 @@ def run_risk_workflow(
 
     stress_test_results = []
     if risk_config.stress_scenarios:
+        stress_kwargs = {}
+        if portfolio_metadata and portfolio_metadata.get("total_notional_usd") is not None:
+            stress_kwargs["portfolio_notional_usd"] = portfolio_metadata[
+                "total_notional_usd"
+            ]
         stress_test_results = execute_traced(
             executor,
             execution_trace,
@@ -190,6 +203,7 @@ def run_risk_workflow(
             tickers,
             weights,
             risk_config=risk_config,
+            **stress_kwargs,
         )
         complete_step(
             plan,

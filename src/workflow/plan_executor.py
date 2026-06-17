@@ -152,10 +152,13 @@ def _validate_portfolio(executor: ApprovedPlanExecutor, context: WorkflowExecuti
         context.loaded_portfolio["weights"],
     )
     normalized_weights = weights.tolist() if hasattr(weights, "tolist") else list(weights)
+    portfolio_metadata = context.loaded_portfolio.get("metadata")
     context.loaded_portfolio = {
         "tickers": tickers,
         "weights": normalized_weights,
     }
+    if portfolio_metadata:
+        context.loaded_portfolio["metadata"] = portfolio_metadata
 
 
 def _load_risk_config(executor: ApprovedPlanExecutor, context: WorkflowExecutionContext) -> None:
@@ -165,6 +168,9 @@ def _load_risk_config(executor: ApprovedPlanExecutor, context: WorkflowExecution
 def _calculate_risk_metrics(executor: ApprovedPlanExecutor, context: WorkflowExecutionContext) -> None:
     if context.loaded_portfolio is None or context.risk_config is None:
         raise PlanExecutionNotSupported("Portfolio and risk configuration are required.")
+    kwargs = {}
+    if context.loaded_portfolio.get("metadata"):
+        kwargs["portfolio_metadata"] = context.loaded_portfolio["metadata"]
     context.risk_report = executor._run_tool(
         "calculate_risk_metrics",
         context.loaded_portfolio["tickers"],
@@ -172,17 +178,23 @@ def _calculate_risk_metrics(executor: ApprovedPlanExecutor, context: WorkflowExe
         start_date=context.risk_config.market_data.start_date,
         end_date=context.risk_config.market_data.end_date,
         risk_config=context.risk_config,
+        **kwargs,
     )
 
 
 def _run_stress_test(executor: ApprovedPlanExecutor, context: WorkflowExecutionContext) -> None:
     if context.loaded_portfolio is None or context.risk_config is None:
         raise PlanExecutionNotSupported("Portfolio and risk configuration are required.")
+    kwargs = {}
+    metadata = context.loaded_portfolio.get("metadata") or {}
+    if metadata.get("total_notional_usd") is not None:
+        kwargs["portfolio_notional_usd"] = metadata["total_notional_usd"]
     context.stress_test_results = executor._run_tool(
         "run_stress_test",
         context.loaded_portfolio["tickers"],
         context.loaded_portfolio["weights"],
         risk_config=context.risk_config,
+        **kwargs,
     )
 
 

@@ -11,6 +11,14 @@ from src.data.portfolio import validate_weights
 
 
 MARKET_PORTFOLIO_COLUMNS = {"ticker", "weight"}
+MARKET_METADATA_COLUMNS = {
+    "portfolio_id",
+    "book",
+    "asset_class",
+    "risk_bucket",
+    "region",
+    "notional_usd",
+}
 EXPOSURE_PROFILE_COLUMNS = {
     "netting_set",
     "time_years",
@@ -89,10 +97,75 @@ def _load_market_portfolio(data: pd.DataFrame) -> dict:
     except ValueError as exc:
         raise ValueError(f"Invalid portfolio weights: {exc}") from exc
 
-    return {
+    portfolio = {
         "tickers": tickers,
         "weights": validated_weights.tolist(),
     }
+    metadata = _market_portfolio_metadata(data, tickers, validated_weights.tolist())
+    if metadata:
+        portfolio["metadata"] = metadata
+    return portfolio
+
+
+def _market_portfolio_metadata(
+    data: pd.DataFrame,
+    tickers: list[str],
+    weights: list[float],
+) -> dict:
+    metadata_columns = [column for column in MARKET_METADATA_COLUMNS if column in data.columns]
+    if not metadata_columns:
+        return {}
+
+    holdings = []
+    total_notional = 0.0
+    has_notional = "notional_usd" in data.columns
+    for index, (_, row) in enumerate(data.iterrows()):
+        holding = {
+            "ticker": tickers[index],
+            "weight": weights[index],
+        }
+        for column in metadata_columns:
+            value = row.get(column)
+            if column == "notional_usd":
+                notional = _optional_non_negative_number(value, column, index + 1)
+                holding[column] = notional
+                if notional is not None:
+                    total_notional += notional
+            else:
+                holding[column] = _optional_text(value)
+        holdings.append(holding)
+
+    metadata = {"holdings": holdings}
+    collection_keys = {
+        "portfolio_id": "portfolio_ids",
+        "book": "books",
+        "asset_class": "asset_classes",
+        "risk_bucket": "risk_buckets",
+        "region": "regions",
+    }
+    for column, collection_key in collection_keys.items():
+        if column in data.columns:
+            values = _unique_non_empty_values(data[column])
+            if values:
+                metadata[collection_key] = values
+                if len(values) == 1:
+                    metadata[column] = values[0]
+    if has_notional:
+        metadata["total_notional_usd"] = float(total_notional)
+
+    return metadata
+
+
+def _unique_non_empty_values(values) -> list[str]:
+    unique_values: list[str] = []
+    seen = set()
+    for value in values:
+        text = _optional_text(value)
+        if text is None or text in seen:
+            continue
+        seen.add(text)
+        unique_values.append(text)
+    return unique_values
 
 
 def _load_exposure_profile(data: pd.DataFrame) -> ExposureProfile:

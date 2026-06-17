@@ -48,6 +48,20 @@ def test_run_stress_test_calculates_deterministic_portfolio_loss():
     assert result["assumptions"]
 
 
+def test_run_stress_test_calculates_dollar_loss_when_notional_is_available():
+    results = run_stress_test(
+        ["SPY", "QQQ", "NVDA", "TLT"],
+        [0.4, 0.3, 0.2, 0.1],
+        risk_config=_stress_config(),
+        portfolio_notional_usd=10_000_000,
+    )
+
+    result = results[0]
+    assert result["base_portfolio_value_usd"] == 10_000_000.0
+    assert result["dollar_portfolio_loss"] == pytest.approx(1_750_000.0)
+    assert result["stressed_portfolio_value_usd"] == pytest.approx(8_250_000.0)
+
+
 def test_run_stress_test_is_executable_through_tool_executor():
     result = ToolExecutor().execute(
         "run_stress_test",

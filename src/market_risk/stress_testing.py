@@ -18,6 +18,7 @@ def run_stress_test(
     weights: Sequence[float],
     risk_config: RiskConfig | None = None,
     stress_scenarios: Sequence[StressScenario | dict] | None = None,
+    portfolio_notional_usd: float | None = None,
 ) -> list[dict]:
     """Apply deterministic ticker-level shocks and return structured results."""
     ticker_list = [str(ticker).strip().upper() for ticker in tickers]
@@ -49,24 +50,36 @@ def run_stress_test(
                 "portfolio_loss_contribution_pct": float(-weight * applied_return),
             }
 
-        results.append(
-            {
-                "scenario_name": scenario.name,
-                "base_portfolio_value": BASE_PORTFOLIO_VALUE,
-                "stressed_portfolio_value": float(stressed_value),
-                "portfolio_loss_pct": float(
-                    (BASE_PORTFOLIO_VALUE - stressed_value) / BASE_PORTFOLIO_VALUE
-                ),
-                "per_ticker_contributions": contributions,
-                "assumptions": [
-                    "SPY and unclassified tickers use the broad equity selloff shock.",
-                    "QQQ uses the technology selloff shock.",
-                    "NVDA uses 1.5 times the technology selloff shock as a high-beta proxy.",
-                    "TLT uses a 15-year duration proxy against the parallel rates shock.",
-                    "The calculation is deterministic and excludes correlations and nonlinear effects.",
-                ],
-            }
+        portfolio_loss_pct = float(
+            (BASE_PORTFOLIO_VALUE - stressed_value) / BASE_PORTFOLIO_VALUE
         )
+        result = {
+            "scenario_name": scenario.name,
+            "base_portfolio_value": BASE_PORTFOLIO_VALUE,
+            "stressed_portfolio_value": float(stressed_value),
+            "portfolio_loss_pct": portfolio_loss_pct,
+            "per_ticker_contributions": contributions,
+            "assumptions": [
+                "SPY and unclassified tickers use the broad equity selloff shock.",
+                "QQQ uses the technology selloff shock.",
+                "NVDA uses 1.5 times the technology selloff shock as a high-beta proxy.",
+                "TLT uses a 15-year duration proxy against the parallel rates shock.",
+                "The calculation is deterministic and excludes correlations and nonlinear effects.",
+            ],
+        }
+        if portfolio_notional_usd is not None:
+            notional = float(portfolio_notional_usd)
+            result.update(
+                {
+                    "base_portfolio_value_usd": notional,
+                    "dollar_portfolio_loss": portfolio_loss_pct * notional,
+                    "stressed_portfolio_value_usd": (
+                        (1.0 - portfolio_loss_pct) * notional
+                    ),
+                }
+            )
+
+        results.append(result)
 
     return results
 

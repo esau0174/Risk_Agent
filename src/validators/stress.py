@@ -79,8 +79,27 @@ def _stress_result_consistency_findings(
                 f"{expected_loss:.2f}%, found {found_loss:.2f}%."
             )
 
+        dollar_loss = get_value(result, "dollar_portfolio_loss")
+        notional = get_value(result, "base_portfolio_value_usd")
+        if dollar_loss is not None and notional is not None:
+            expected_dollar_loss = (
+                float(get_value(result, "portfolio_loss_pct")) * float(notional)
+            )
+            if abs(float(dollar_loss) - expected_dollar_loss) > value_tolerance:
+                errors.append(
+                    f"Stress scenario '{scenario_name}' dollar portfolio loss mismatch: "
+                    f"expected USD {expected_dollar_loss:.2f}, found USD "
+                    f"{float(dollar_loss):.2f}."
+                )
+
         found_value = _extract_stressed_portfolio_value(scenario_text)
-        expected_value = float(get_value(result, "stressed_portfolio_value"))
+        expected_value = float(
+            get_value(
+                result,
+                "stressed_portfolio_value_usd",
+                get_value(result, "stressed_portfolio_value"),
+            )
+        )
         if found_value is not None and abs(found_value - expected_value) > value_tolerance:
             errors.append(
                 f"Stress scenario '{scenario_name}' stressed portfolio value mismatch: "
@@ -134,11 +153,11 @@ def _extract_stress_percentage(text: str, label_pattern: str) -> float | None:
 def _extract_stressed_portfolio_value(text: str) -> float | None:
     match = re.search(
         r"stressed\s+portfolio\s+value[^.!?;\n\d]"
-        r"{0,20}\$?(?P<value>\d+(?:\.\d+)?)",
+        r"{0,20}(?:USD\s*)?\$?(?P<value>\d[\d,]*(?:\.\d+)?)",
         text,
         re.I,
     )
-    return float(match.group("value")) if match else None
+    return float(match.group("value").replace(",", "")) if match else None
 
 
 def _extract_ticker_contribution(text: str, ticker: str) -> float | None:

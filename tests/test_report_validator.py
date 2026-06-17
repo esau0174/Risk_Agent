@@ -24,6 +24,17 @@ def _valid_risk_report() -> dict:
     }
 
 
+def _valid_risk_report_with_notional() -> dict:
+    report = _valid_risk_report()
+    report["metadata"] = {"total_notional_usd": 10_000_000.0}
+    report["dollar_risk_metrics"] = {
+        "dollar_historical_var": 200_000.0,
+        "dollar_expected_shortfall": 300_000.0,
+        "dollar_max_drawdown": 1_500_000.0,
+    }
+    return report
+
+
 def _valid_methodology_notes() -> list[dict]:
     return [
         {"title": "Historical VaR"},
@@ -53,6 +64,18 @@ def _stress_results() -> list[dict]:
             },
         }
     ]
+
+
+def _stress_results_with_notional() -> list[dict]:
+    results = _stress_results()
+    results[0].update(
+        {
+            "base_portfolio_value_usd": 10_000_000.0,
+            "dollar_portfolio_loss": 1_750_000.0,
+            "stressed_portfolio_value_usd": 8_250_000.0,
+        }
+    )
+    return results
 
 
 def _pfe_result() -> dict:
@@ -88,6 +111,36 @@ def test_valid_numerical_report_and_safe_commentary_pass():
     assert result.passed is True
     assert not result.errors
     assert all(check.passed for check in result.checks)
+
+
+def test_matching_dollar_market_metrics_pass():
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report_with_notional(),
+        _valid_methodology_notes(),
+        _safe_commentary(),
+    )
+
+    assert result.passed is True
+    assert any(
+        check.name == "dollar_market_metric_consistency" and check.passed
+        for check in result.checks
+    )
+
+
+def test_mismatched_dollar_var_fails():
+    report = _valid_risk_report_with_notional()
+    report["dollar_risk_metrics"]["dollar_historical_var"] = 999_000.0
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        report,
+        _valid_methodology_notes(),
+        _safe_commentary(),
+    )
+
+    assert result.passed is False
+    assert any("Dollar historical VaR mismatch" in error for error in result.errors)
 
 
 def test_negative_var_fails():
@@ -404,6 +457,47 @@ def test_matching_stress_loss_and_values_pass():
         check.name == "stress_result_consistency" and check.passed
         for check in result.checks
     )
+
+
+def test_matching_dollar_stress_loss_and_value_pass():
+    commentary = (
+        "Stress Scenario Analysis\n"
+        "Combined selloff: portfolio loss 17.50% / USD 1,750,000.00, "
+        "stressed portfolio value USD 8,250,000.00, with the main contributions "
+        "from QQQ (6.00%) and SPY (4.00%). Assumptions and limitations: "
+        "deterministic proxy stress test only; not investment advice."
+    )
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        commentary,
+        stress_results=_stress_results_with_notional(),
+    )
+
+    assert result.passed is True
+
+
+def test_mismatched_dollar_stress_loss_fails():
+    stress_results = _stress_results_with_notional()
+    stress_results[0]["dollar_portfolio_loss"] = 1_000_000.0
+    commentary = (
+        "Stress Scenario Analysis: Combined selloff has a portfolio loss of 17.50% "
+        "and stressed portfolio value USD 8,250,000.00. Assumptions and limitations "
+        "apply; not investment advice."
+    )
+
+    result = validate_generated_report(
+        _valid_parsed_portfolio(),
+        _valid_risk_report(),
+        _valid_methodology_notes(),
+        commentary,
+        stress_results=stress_results,
+    )
+
+    assert result.passed is False
+    assert any("dollar portfolio loss mismatch" in error for error in result.errors)
 
 
 def test_mismatched_stress_loss_fails():

@@ -330,8 +330,13 @@ def _build_commentary_facts(
         "end_date": metadata["end_date"],
         "confidence_level": metadata["confidence_level"],
         "risk_metrics": metrics,
+        "dollar_risk_metrics": risk_report.get("dollar_risk_metrics", {}),
         "risk_metrics_display": {
             name: f"{value:.2%}" for name, value in metrics.items()
+        },
+        "dollar_risk_metrics_display": {
+            name: f"USD {value:,.2f}"
+            for name, value in risk_report.get("dollar_risk_metrics", {}).items()
         },
         "latest_cumulative_return": risk_report["latest_cumulative_return"],
         "number_of_observations": risk_report["number_of_observations"],
@@ -344,6 +349,16 @@ def _build_commentary_facts(
             {
                 **result,
                 "portfolio_loss_display": f"{result['portfolio_loss_pct']:.2%}",
+                "dollar_portfolio_loss_display": (
+                    f"USD {result['dollar_portfolio_loss']:,.2f}"
+                    if result.get("dollar_portfolio_loss") is not None
+                    else None
+                ),
+                "stressed_portfolio_value_usd_display": (
+                    f"USD {result['stressed_portfolio_value_usd']:,.2f}"
+                    if result.get("stressed_portfolio_value_usd") is not None
+                    else None
+                ),
                 "per_ticker_contribution_display": {
                     ticker: f"{details['portfolio_loss_contribution_pct']:.2%}"
                     for ticker, details in result["per_ticker_contributions"].items()
@@ -432,6 +447,7 @@ def _build_fallback_commentary(
 ) -> str:
     metadata = risk_report["metadata"]
     metrics = risk_report["risk_metrics"]
+    dollar_metrics = risk_report.get("dollar_risk_metrics", {})
     tickers = metadata["tickers"]
     weights = metadata["weights"]
     largest_index = max(range(len(weights)), key=weights.__getitem__)
@@ -442,6 +458,21 @@ def _build_fallback_commentary(
         references = " Methodology references: " + ", ".join(methodology_titles) + "."
 
     stress_section = _build_fallback_stress_section(stress_results or [])
+    dollar_var_text = (
+        f" / USD {dollar_metrics['dollar_historical_var']:,.2f}"
+        if dollar_metrics.get("dollar_historical_var") is not None
+        else ""
+    )
+    dollar_es_text = (
+        f" / USD {dollar_metrics['dollar_expected_shortfall']:,.2f}"
+        if dollar_metrics.get("dollar_expected_shortfall") is not None
+        else ""
+    )
+    dollar_drawdown_text = (
+        f" / USD {dollar_metrics['dollar_max_drawdown']:,.2f}"
+        if dollar_metrics.get("dollar_max_drawdown") is not None
+        else ""
+    )
     historical_period = (
         f"from {metadata['start_date']} to {metadata['end_date']}"
         if metadata.get("end_date")
@@ -452,12 +483,12 @@ def _build_fallback_commentary(
         f"The workflow analyzed {', '.join(tickers)} using historical data "
         f"{historical_period}. Annualized volatility is "
         f"{metrics['annualized_volatility']:.2%}, 95% historical VaR is "
-        f"{metrics['historical_var']:.2%}. Based on the historical daily return "
+        f"{metrics['historical_var']:.2%}{dollar_var_text}. Based on the historical daily return "
         "distribution, losses exceeded this threshold in approximately the worst 5% "
         "of observations in the lookback window. Expected Shortfall is "
-        f"{metrics['expected_shortfall']:.2%}; it estimates the average loss conditional "
+        f"{metrics['expected_shortfall']:.2%}{dollar_es_text}; it estimates the average loss conditional "
         "on losses exceeding the VaR threshold. Maximum drawdown is "
-        f"{metrics['max_drawdown']:.2%}. The largest single position is "
+        f"{metrics['max_drawdown']:.2%}{dollar_drawdown_text}. The largest single position is "
         f"{tickers[largest_index]} at {weights[largest_index]:.2%}."
         f"{stress_section}"
         "\n\nAssumptions and "
@@ -483,10 +514,18 @@ def _build_fallback_stress_section(stress_results: list[dict]) -> str:
             f"{ticker} ({details['portfolio_loss_contribution_pct']:.2%})"
             for ticker, details in contributors[:3]
         )
+        loss_text = f"{result['portfolio_loss_pct']:.2%}"
+        if result.get("dollar_portfolio_loss") is not None:
+            loss_text += f" / USD {result['dollar_portfolio_loss']:,.2f}"
+        if result.get("stressed_portfolio_value_usd") is not None:
+            stressed_value_text = (
+                f"USD {result['stressed_portfolio_value_usd']:,.2f}"
+            )
+        else:
+            stressed_value_text = f"{result['stressed_portfolio_value']:.2f}"
         scenario_summaries.append(
-            f"{result['scenario_name']}: portfolio loss "
-            f"{result['portfolio_loss_pct']:.2%}, stressed portfolio value "
-            f"{result['stressed_portfolio_value']:.2f}, with the main loss "
+            f"{result['scenario_name']}: portfolio loss {loss_text}, "
+            f"stressed portfolio value {stressed_value_text}, with the main loss "
             f"contributions from {contributor_summary}."
         )
 

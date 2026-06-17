@@ -26,6 +26,7 @@ def generate_portfolio_risk_report(
     end_date: str | None = None,
     confidence_level: float = 0.95,
     risk_config: RiskConfig | None = None,
+    portfolio_metadata: dict | None = None,
 ) -> dict:
     """Generate a high-level Phase 1 portfolio risk report."""
     ticker_list = list(tickers)
@@ -79,6 +80,12 @@ def generate_portfolio_risk_report(
         "end_date": end_date,
         "confidence_level": float(confidence_level),
     }
+    if portfolio_metadata:
+        metadata["portfolio_metadata"] = portfolio_metadata
+        if "total_notional_usd" in portfolio_metadata:
+            metadata["total_notional_usd"] = float(
+                portfolio_metadata["total_notional_usd"]
+            )
     if risk_config is not None:
         metadata.update(
             {
@@ -89,11 +96,38 @@ def generate_portfolio_risk_report(
             }
         )
 
-    return {
+    dollar_risk_metrics = _dollar_risk_metrics(
+        calculated_metrics,
+        metadata.get("total_notional_usd"),
+    )
+
+    report = {
         "metadata": metadata,
         "risk_metrics": calculated_metrics,
         "correlation_matrix": correlations.to_dict(),
         "latest_cumulative_return": float(cumulative_returns.iloc[-1]),
         "number_of_observations": int(len(portfolio_returns)),
         "analysis_timestamp": datetime.now(UTC).isoformat(),
+    }
+    if dollar_risk_metrics:
+        report["dollar_risk_metrics"] = dollar_risk_metrics
+    return report
+
+
+def _dollar_risk_metrics(
+    risk_metrics: dict[str, float],
+    total_notional_usd: float | None,
+) -> dict[str, float]:
+    if total_notional_usd is None:
+        return {}
+
+    metric_map = {
+        "historical_var": "dollar_historical_var",
+        "expected_shortfall": "dollar_expected_shortfall",
+        "max_drawdown": "dollar_max_drawdown",
+    }
+    return {
+        dollar_key: float(risk_metrics[metric_key]) * float(total_notional_usd)
+        for metric_key, dollar_key in metric_map.items()
+        if metric_key in risk_metrics
     }

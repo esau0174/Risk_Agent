@@ -63,6 +63,37 @@ def test_percentage_weight_strings_are_normalized(tmp_path):
     assert load_portfolio_file(path) == EXPECTED_PORTFOLIO
 
 
+def test_richer_market_portfolio_schema_preserves_metadata(tmp_path):
+    path = tmp_path / "institutional_portfolio.csv"
+    pd.DataFrame(
+        {
+            "portfolio_id": ["RF-MKT-001", "RF-MKT-001"],
+            "book": ["Global Macro", "Global Macro"],
+            "ticker": ["SPY", "QQQ"],
+            "asset_class": ["Equity ETF", "Equity ETF"],
+            "risk_bucket": ["Broad Equity", "Growth / Technology"],
+            "region": ["US", "US"],
+            "weight": ["60%", "40%"],
+            "notional_usd": [6_000_000, 4_000_000],
+        }
+    ).to_csv(path, index=False)
+
+    result = load_portfolio_file(path)
+
+    assert result["tickers"] == ["SPY", "QQQ"]
+    assert result["weights"] == [0.6, 0.4]
+    assert result["metadata"]["portfolio_id"] == "RF-MKT-001"
+    assert result["metadata"]["book"] == "Global Macro"
+    assert result["metadata"]["asset_classes"] == ["Equity ETF"]
+    assert result["metadata"]["risk_buckets"] == [
+        "Broad Equity",
+        "Growth / Technology",
+    ]
+    assert result["metadata"]["regions"] == ["US"]
+    assert result["metadata"]["total_notional_usd"] == 10_000_000.0
+    assert result["metadata"]["holdings"][0]["notional_usd"] == 6_000_000.0
+
+
 def test_missing_required_columns_raise_clear_error(tmp_path):
     path = tmp_path / "portfolio.csv"
     pd.DataFrame({"ticker": ["SPY"], "allocation": [1.0]}).to_csv(path, index=False)

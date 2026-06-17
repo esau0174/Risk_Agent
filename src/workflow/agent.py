@@ -542,17 +542,18 @@ def _strip_legacy_report_title(user_report: str) -> str:
 
 def _build_market_report(result) -> str:
     metrics = result.risk_report["risk_metrics"]
+    dollar_metrics = result.risk_report.get("dollar_risk_metrics", {})
     lines = [
         "Market Risk",
+        *_market_metadata_lines(result.risk_report.get("metadata", {})),
         f"- Annualized volatility: {metrics['annualized_volatility']:.2%}",
         f"- 95% historical VaR: {metrics['historical_var']:.2%}",
         f"- 95% Expected Shortfall: {metrics['expected_shortfall']:.2%}",
         f"- Maximum drawdown: {metrics['max_drawdown']:.2%}",
     ]
+    lines.extend(_dollar_market_metric_lines(dollar_metrics))
     if result.stress_test_results:
-        lines.append(
-            f"- Stress scenario loss: {result.stress_test_results[0]['portfolio_loss_pct']:.2%}"
-        )
+        lines.extend(_stress_result_lines(result.stress_test_results[0]))
     lines.extend(
         [
             f"- Validation: {'PASSED' if result.validation_result.passed else 'FAILED'}",
@@ -562,6 +563,62 @@ def _build_market_report(result) -> str:
         ]
     )
     return "\n".join(lines)
+
+
+def _dollar_market_metric_lines(dollar_metrics: dict) -> list[str]:
+    lines = []
+    if dollar_metrics.get("dollar_historical_var") is not None:
+        lines.append(
+            f"- Dollar historical VaR: USD {dollar_metrics['dollar_historical_var']:,.2f}"
+        )
+    if dollar_metrics.get("dollar_expected_shortfall") is not None:
+        lines.append(
+            "- Dollar Expected Shortfall: "
+            f"USD {dollar_metrics['dollar_expected_shortfall']:,.2f}"
+        )
+    if dollar_metrics.get("dollar_max_drawdown") is not None:
+        lines.append(
+            f"- Dollar maximum drawdown: USD {dollar_metrics['dollar_max_drawdown']:,.2f}"
+        )
+    return lines
+
+
+def _stress_result_lines(stress_result: dict) -> list[str]:
+    lines = [f"- Stress scenario loss: {stress_result['portfolio_loss_pct']:.2%}"]
+    if stress_result.get("dollar_portfolio_loss") is not None:
+        lines[-1] += f" / USD {stress_result['dollar_portfolio_loss']:,.2f}"
+    if stress_result.get("stressed_portfolio_value_usd") is not None:
+        lines.append(
+            "- Stressed portfolio value: "
+            f"USD {stress_result['stressed_portfolio_value_usd']:,.2f}"
+        )
+    return lines
+
+
+def _market_metadata_lines(metadata: dict) -> list[str]:
+    portfolio_metadata = metadata.get("portfolio_metadata") or {}
+    if not portfolio_metadata:
+        return []
+
+    lines = []
+    if portfolio_metadata.get("portfolio_id"):
+        lines.append(f"- Portfolio ID: {portfolio_metadata['portfolio_id']}")
+    if portfolio_metadata.get("book"):
+        lines.append(f"- Book: {portfolio_metadata['book']}")
+    if portfolio_metadata.get("asset_classes"):
+        lines.append(
+            "- Asset classes: " + ", ".join(portfolio_metadata["asset_classes"])
+        )
+    if portfolio_metadata.get("risk_buckets"):
+        lines.append(
+            "- Risk buckets: " + ", ".join(portfolio_metadata["risk_buckets"])
+        )
+    if portfolio_metadata.get("regions"):
+        lines.append("- Regions: " + ", ".join(portfolio_metadata["regions"]))
+    total_notional = portfolio_metadata.get("total_notional_usd")
+    if total_notional is not None:
+        lines.append(f"- Total notional: USD {total_notional:,.2f}")
+    return lines
 
 
 def _build_credit_report(result) -> str:

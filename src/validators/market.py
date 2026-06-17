@@ -8,6 +8,11 @@ from src.validators.common import ValidationCheck, get_value, run_check
 
 
 _PERCENTAGE_PATTERN = re.compile(r"(?P<value>\d+(?:\.\d+)?)\s*%")
+_DOLLAR_MARKET_METRICS = {
+    "historical_var": ("dollar_historical_var", "Dollar historical VaR"),
+    "expected_shortfall": ("dollar_expected_shortfall", "Dollar Expected Shortfall"),
+    "max_drawdown": ("dollar_max_drawdown", "Dollar maximum drawdown"),
+}
 _METRIC_LABELS = {
     "annualized_volatility": (
         "Annualized volatility",
@@ -92,6 +97,21 @@ def validate_market_metric_consistency(
 
     if risk_report is None:
         return
+
+    dollar_errors = _dollar_metric_consistency_errors(risk_report)
+    checks.append(
+        ValidationCheck(
+            name="dollar_market_metric_consistency",
+            passed=not dollar_errors,
+            message=(
+                "Dollar market risk metrics are consistent with percentage metrics and notional."
+                if not dollar_errors
+                else "Dollar market risk metrics are inconsistent with percentage metrics and notional."
+            ),
+        )
+    )
+    errors.extend(dollar_errors)
+
     consistency_errors = _commentary_metric_consistency_errors(
         commentary,
         risk_metrics,
@@ -155,6 +175,33 @@ def _commentary_metric_consistency_errors(
                     f"{display_name} percentage mismatch: expected "
                     f"{expected_percentage:.2f}%, found {found_percentage:.2f}%."
                 )
+    return errors
+
+
+def _dollar_metric_consistency_errors(
+    risk_report,
+    dollar_tolerance: float = 0.01,
+) -> list[str]:
+    metadata = get_value(risk_report, "metadata", {}) or {}
+    notional = get_value(metadata, "total_notional_usd")
+    if not _is_number(notional):
+        return []
+
+    risk_metrics = get_value(risk_report, "risk_metrics", {}) or {}
+    dollar_metrics = get_value(risk_report, "dollar_risk_metrics", {}) or {}
+    errors = []
+    for metric_key, (dollar_key, display_name) in _DOLLAR_MARKET_METRICS.items():
+        metric_value = get_value(risk_metrics, metric_key)
+        dollar_value = get_value(dollar_metrics, dollar_key)
+        if not _is_number(metric_value) or dollar_value is None:
+            continue
+        expected_value = float(metric_value) * float(notional)
+        if not _is_number(dollar_value) or abs(float(dollar_value) - expected_value) > dollar_tolerance:
+            found = float(dollar_value) if _is_number(dollar_value) else float("nan")
+            errors.append(
+                f"{display_name} mismatch: expected USD {expected_value:.2f}, "
+                f"found USD {found:.2f}."
+            )
     return errors
 
 

@@ -1,5 +1,5 @@
-ticker,weight
-SPY,40%
-QQQ,30%
-NVDA,20%
-TLT,10%
+portfolio_id,book,ticker,asset_class,risk_bucket,region,weight,notional_usd
+RF-MKT-001,Global Macro,SPY,Equity ETF,Broad Equity,US,40%,4000000
+RF-MKT-001,Global Macro,QQQ,Equity ETF,Growth / Technology,US,30%,3000000
+RF-MKT-001,Global Macro,NVDA,Single Name Equity,AI / Semiconductor,US,20%,2000000
+RF-MKT-001,Global Macro,TLT,Fixed Income ETF,Long Duration Rates,US,10%,1000000

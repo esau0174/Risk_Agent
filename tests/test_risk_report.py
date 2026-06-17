@@ -82,6 +82,53 @@ def test_generate_portfolio_risk_report_does_not_call_yfinance_directly(monkeypa
     assert report["number_of_observations"] == 1
 
 
+def test_generate_portfolio_risk_report_includes_portfolio_metadata(monkeypatch):
+    prices = pd.DataFrame({"SPY": [100.0, 101.0], "QQQ": [100.0, 102.0]})
+    monkeypatch.setattr(
+        risk_report,
+        "download_price_data",
+        lambda tickers, start_date, end_date=None: prices,
+    )
+
+    metadata = {
+        "portfolio_id": "RF-MKT-001",
+        "book": "Global Macro",
+        "total_notional_usd": 10_000_000.0,
+    }
+    report = risk_report.generate_portfolio_risk_report(
+        ["SPY", "QQQ"],
+        [0.6, 0.4],
+        "2023-01-01",
+        portfolio_metadata=metadata,
+    )
+
+    assert report["metadata"]["portfolio_metadata"] == metadata
+    assert report["metadata"]["total_notional_usd"] == 10_000_000.0
+    assert report["dollar_risk_metrics"]["dollar_historical_var"] == pytest.approx(
+        report["risk_metrics"]["historical_var"] * 10_000_000.0
+    )
+    assert report["dollar_risk_metrics"]["dollar_expected_shortfall"] == pytest.approx(
+        report["risk_metrics"]["expected_shortfall"] * 10_000_000.0
+    )
+
+
+def test_generate_portfolio_risk_report_omits_dollar_metrics_without_notional(monkeypatch):
+    prices = pd.DataFrame({"SPY": [100.0, 101.0], "QQQ": [100.0, 102.0]})
+    monkeypatch.setattr(
+        risk_report,
+        "download_price_data",
+        lambda tickers, start_date, end_date=None: prices,
+    )
+
+    report = risk_report.generate_portfolio_risk_report(
+        ["SPY", "QQQ"],
+        [0.6, 0.4],
+        "2023-01-01",
+    )
+
+    assert "dollar_risk_metrics" not in report
+
+
 def test_generate_portfolio_risk_report_uses_risk_config(monkeypatch):
     prices = pd.DataFrame(
         {"SPY": [100.0, 102.0, 101.0], "QQQ": [100.0, 101.0, 103.0]}
