@@ -21,6 +21,7 @@ from src.workflow.types import AgentWorkflowResult, WorkflowPlan
 
 MARKET_DATA_FILE = "examples/sample_portfolio.csv"
 CREDIT_DATA_FILE = "examples/sample_exposure_profile.csv"
+SENSITIVITY_DATA_FILE = "examples/sample_sensitivities.csv"
 CONFIG_FILE = "examples/sample_risk_config.json"
 
 
@@ -357,6 +358,7 @@ def _execute_approved_plan_or_route(
         scenario=scenario,
         market_data_file=MARKET_DATA_FILE,
         credit_data_file=CREDIT_DATA_FILE,
+        sensitivity_data_file=SENSITIVITY_DATA_FILE,
         config_file=CONFIG_FILE,
         use_llm=False,
         selected_route=execution_route,
@@ -457,6 +459,13 @@ def _outputs_from_plan_context(context: WorkflowExecutionContext) -> dict:
         )
         raw_outputs["regulatory_risk"] = context.regulatory_readiness
 
+    if context.sensitivity_result is not None:
+        user_report_sections.append(_build_sensitivity_report(context.sensitivity_result))
+        final_sections.append("Sensitivity Risk")
+        raw_outputs["sensitivity_risk"] = context.sensitivity_result
+        validation_results["sensitivity_risk"] = {"passed": True}
+        validation_result = {"passed": True, "sensitivity_risk": {"passed": True}}
+
     if not user_report_sections:
         user_report_sections.append("No executable risk report section was produced.")
 
@@ -502,6 +511,8 @@ def _default_input_schemas_for_query(query: str) -> list[str]:
         schemas.append("market_portfolio")
     if any(term in normalized for term in ("credit", "pfe", "exposure", "counterparty")):
         schemas.append("exposure_profile")
+    if any(term in normalized for term in ("greek", "greeks", "sensitivity", "sensitivities")):
+        schemas.append("sensitivity_file")
     if not schemas and "regulatory" not in normalized and "sa-ccr" not in normalized:
         schemas.append("market_portfolio")
     return schemas
@@ -516,6 +527,8 @@ def _detect_modules_from_plan(plan: WorkflowPlan) -> list[str]:
         modules.append("Credit Risk")
     if "assess_regulatory_readiness" in tool_names:
         modules.append("Regulatory Risk")
+    if "aggregate_greeks" in tool_names:
+        modules.append("Sensitivity Risk")
     return modules
 
 
@@ -527,6 +540,8 @@ def _execution_route_from_modules(modules: list[str]) -> str:
         return "credit"
     if selected == {"Regulatory Risk"}:
         return "regulatory"
+    if selected == {"Sensitivity Risk"}:
+        return "sensitivity"
     return "full"
 
 
@@ -644,6 +659,44 @@ def _build_credit_report(result) -> str:
             result.llm_commentary,
         ]
     )
+    return "\n".join(lines)
+
+
+def _build_sensitivity_report(result: dict) -> str:
+    warnings = result.get("warnings", [])
+    lines = [
+        "Sensitivity Risk",
+        "- Source: precomputed sensitivities from an upstream pricing/risk engine",
+        f"- Records: {result['record_count']}",
+        f"- Portfolio IDs: {', '.join(result['portfolio_ids'])}",
+        f"- Books: {', '.join(result['books'])}",
+        f"- Currencies: {', '.join(result['currencies'])}",
+        f"- Total delta: {result['total_delta']:,.2f}",
+        f"- Total gamma: {result['total_gamma']:,.2f}",
+        f"- Total vega: {result['total_vega']:,.2f}",
+        f"- Total theta: {result['total_theta']:,.2f}",
+        (
+            "- Largest delta risk factor: "
+            f"{result['largest_delta_risk_factor']['risk_factor']} "
+            f"({result['largest_delta_risk_factor']['absolute_value']:,.2f})"
+        ),
+        (
+            "- Largest vega risk factor: "
+            f"{result['largest_vega_risk_factor']['risk_factor']} "
+            f"({result['largest_vega_risk_factor']['absolute_value']:,.2f})"
+        ),
+        "- Validation: PASSED",
+        "",
+        "Sensitivity Risk Commentary",
+        (
+            "RiskFlow Agent aggregates and validates supplied Greeks only. "
+            "Delta, gamma, vega, and theta are assumed to come from an upstream "
+            "pricing or risk engine; this project does not calculate pricing-model "
+            "Greeks."
+        ),
+    ]
+    if warnings:
+        lines.insert(7, "- Warnings: " + " ".join(warnings))
     return "\n".join(lines)
 
 

@@ -9,6 +9,9 @@ EXPECTED_TOOL_NAMES = [
     "load_exposure_profile",
     "calculate_pfe_metrics",
     "assess_regulatory_readiness",
+    "load_sensitivity_file",
+    "validate_sensitivity_file",
+    "aggregate_greeks",
     "validate_portfolio",
     "load_risk_config",
     "calculate_risk_metrics",
@@ -25,6 +28,9 @@ EXPECTED_TOOL_MODULES = {
     "load_exposure_profile": "shared",
     "calculate_pfe_metrics": "credit_risk",
     "assess_regulatory_readiness": "regulatory_risk",
+    "load_sensitivity_file": "sensitivity_risk",
+    "validate_sensitivity_file": "sensitivity_risk",
+    "aggregate_greeks": "sensitivity_risk",
     "validate_portfolio": "market_risk",
     "load_risk_config": "shared",
     "calculate_risk_metrics": "market_risk",
@@ -72,6 +78,11 @@ def test_list_tools_by_module_returns_category_tools():
     ]
     assert [tool.name for tool in list_tools_by_module("regulatory_risk")] == [
         "assess_regulatory_readiness"
+    ]
+    assert [tool.name for tool in list_tools_by_module("sensitivity_risk")] == [
+        "load_sensitivity_file",
+        "validate_sensitivity_file",
+        "aggregate_greeks",
     ]
 
 

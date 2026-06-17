@@ -21,6 +21,9 @@ SUPPORTED_DIRECT_TOOLS = {
     "run_stress_test",
     "calculate_pfe_metrics",
     "assess_regulatory_readiness",
+    "load_sensitivity_file",
+    "validate_sensitivity_file",
+    "aggregate_greeks",
     "retrieve_methodology",
     "generate_commentary",
     "validate_report",
@@ -56,6 +59,11 @@ class ApprovedPlanExecutor:
             return False
         if "load_exposure_profile" in tool_names and context.selected_route not in {
             "credit",
+            "full",
+        }:
+            return False
+        if "load_sensitivity_file" in tool_names and context.selected_route not in {
+            "sensitivity",
             "full",
         }:
             return False
@@ -223,6 +231,36 @@ def _assess_regulatory_readiness(
     )
 
 
+def _load_sensitivity_file(executor: ApprovedPlanExecutor, context: WorkflowExecutionContext) -> None:
+    if context.sensitivity_data_file is None:
+        raise PlanExecutionNotSupported("No sensitivity file is available.")
+    context.sensitivity_records = executor._run_tool(
+        "load_sensitivity_file",
+        context.sensitivity_data_file,
+    )
+
+
+def _validate_sensitivity_file(
+    executor: ApprovedPlanExecutor,
+    context: WorkflowExecutionContext,
+) -> None:
+    if context.sensitivity_records is None:
+        raise PlanExecutionNotSupported("Sensitivity records are required before validation.")
+    context.sensitivity_records = executor._run_tool(
+        "validate_sensitivity_file",
+        context.sensitivity_records,
+    )
+
+
+def _aggregate_greeks(executor: ApprovedPlanExecutor, context: WorkflowExecutionContext) -> None:
+    if context.sensitivity_records is None:
+        raise PlanExecutionNotSupported("Sensitivity records are required before aggregation.")
+    context.sensitivity_result = executor._run_tool(
+        "aggregate_greeks",
+        context.sensitivity_records,
+    )
+
+
 def _retrieve_methodology(executor: ApprovedPlanExecutor, context: WorkflowExecutionContext) -> None:
     docs = load_methodology_docs()
     retrieved_notes: list[dict] = []
@@ -348,6 +386,9 @@ _ADAPTERS: dict[str, Callable[[ApprovedPlanExecutor, WorkflowExecutionContext], 
     "run_stress_test": _run_stress_test,
     "calculate_pfe_metrics": _calculate_pfe_metrics,
     "assess_regulatory_readiness": _assess_regulatory_readiness,
+    "load_sensitivity_file": _load_sensitivity_file,
+    "validate_sensitivity_file": _validate_sensitivity_file,
+    "aggregate_greeks": _aggregate_greeks,
     "retrieve_methodology": _retrieve_methodology,
     "generate_commentary": _generate_commentary,
     "validate_report": _validate_report,
@@ -371,6 +412,12 @@ def _input_summary(tool_name: str, context: WorkflowExecutionContext) -> str:
         return "exposure profile and credit limits"
     if tool_name == "assess_regulatory_readiness":
         return "available workflow inputs"
+    if tool_name == "load_sensitivity_file":
+        return "precomputed Greeks sensitivity file"
+    if tool_name == "validate_sensitivity_file":
+        return "loaded precomputed Greeks records"
+    if tool_name == "aggregate_greeks":
+        return "validated precomputed Greeks records"
     if tool_name == "retrieve_methodology":
         return "analysis query and local methodology documents"
     if tool_name == "generate_commentary":
@@ -399,6 +446,12 @@ def _output_summary(tool_name: str, context: WorkflowExecutionContext) -> str:
         return "calculated PFE and EPE metrics"
     if tool_name == "assess_regulatory_readiness" and context.regulatory_readiness is not None:
         return f"readiness status {context.regulatory_readiness['overall_status']}"
+    if tool_name == "load_sensitivity_file" and context.sensitivity_records is not None:
+        return f"loaded {len(context.sensitivity_records)} sensitivity records"
+    if tool_name == "validate_sensitivity_file" and context.sensitivity_records is not None:
+        return f"validated {len(context.sensitivity_records)} sensitivity records"
+    if tool_name == "aggregate_greeks" and context.sensitivity_result is not None:
+        return "aggregated supplied delta, gamma, vega, and theta"
     if tool_name == "retrieve_methodology":
         return f"retrieved {len(context.methodology_notes)} methodology notes"
     if tool_name == "generate_commentary" and context.commentary is not None:

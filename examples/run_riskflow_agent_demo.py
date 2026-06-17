@@ -145,6 +145,8 @@ def _available_input_schemas(detected_modules: list[str]) -> list[str]:
         schemas.append("market_portfolio")
     if "Credit Risk" in detected_modules:
         schemas.append("exposure_profile")
+    if "Sensitivity Risk" in detected_modules:
+        schemas.append("sensitivity_file")
     return schemas
 
 

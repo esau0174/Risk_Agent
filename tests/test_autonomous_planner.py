@@ -111,6 +111,9 @@ def test_autonomous_planner_proposes_all_requested_risk_modules():
     assert set(tool_names) <= {
         "load_portfolio_file",
         "load_exposure_profile",
+        "load_sensitivity_file",
+        "validate_sensitivity_file",
+        "aggregate_greeks",
         "validate_portfolio",
         "load_risk_config",
         "calculate_risk_metrics",
@@ -121,6 +124,56 @@ def test_autonomous_planner_proposes_all_requested_risk_modules():
         "generate_commentary",
         "validate_report",
     }
+
+
+def test_autonomous_planner_routes_greeks_query_to_sensitivity_tools():
+    plan = propose_autonomous_workflow_plan(
+        "Review Greeks exposure and check sensitivity concentration.",
+        available_input_schemas=["sensitivity_file"],
+    )
+
+    assert [step.tool_name for step in plan.steps] == [
+        "load_sensitivity_file",
+        "validate_sensitivity_file",
+        "aggregate_greeks",
+    ]
+
+
+def test_run_agent_workflow_sensitivity_query_returns_sensitivity_report():
+    result = run_agent_workflow(
+        query="Review Greeks exposure and check sensitivity concentration.",
+        scenario="full",
+        planner_mode="rule",
+    )
+
+    assert result.detected_modules == ["Sensitivity Risk"]
+    assert result.orchestration_trace["execution_mode"] == "approved_plan_executor"
+    assert result.orchestration_trace["selected_route"] == "sensitivity"
+    assert result.orchestration_trace["executed_tools"] == [
+        "load_sensitivity_file",
+        "validate_sensitivity_file",
+        "aggregate_greeks",
+    ]
+    assert "Sensitivity Risk" in result.user_report
+    assert "precomputed sensitivities" in result.user_report
+    assert "does not calculate pricing-model Greeks" in result.user_report
+    assert result.validation_result["passed"] is True
+    assert "sensitivity_risk" in result.raw_outputs
+
+
+def test_run_agent_workflow_market_and_greeks_query_routes_both_modules():
+    result = run_agent_workflow(
+        query="Run market risk and Greeks review.",
+        scenario="full",
+        planner_mode="rule",
+    )
+
+    assert result.detected_modules == ["Market Risk", "Sensitivity Risk"]
+    assert result.orchestration_trace["execution_mode"] == "approved_plan_executor"
+    assert "calculate_risk_metrics" in result.orchestration_trace["executed_tools"]
+    assert "aggregate_greeks" in result.orchestration_trace["executed_tools"]
+    assert "Market Risk" in result.user_report
+    assert "Sensitivity Risk" in result.user_report
 
 
 def test_plan_validator_accepts_valid_autonomous_plan():

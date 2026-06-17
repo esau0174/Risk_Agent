@@ -18,6 +18,9 @@ from src.knowledge.rag import retrieve_relevant_methodology
 from src.report_validator import validate_generated_report
 from src.core.risk_config import load_risk_config
 from src.regulatory_risk.readiness import assess_regulatory_readiness
+from src.sensitivity_risk.analytics import aggregate_greeks
+from src.sensitivity_risk.loader import load_sensitivity_file
+from src.sensitivity_risk.validator import validate_sensitivity_file
 
 
 @dataclass(frozen=True)
@@ -64,6 +67,27 @@ _REGISTERED_TOOLS: tuple[RiskTool, ...] = (
         description="Assess input readiness for SA-CCR and SIMM / RegIM workflows.",
         callable_name="src.regulatory_risk.assess_regulatory_readiness",
         handler=assess_regulatory_readiness,
+    ),
+    RiskTool(
+        name="load_sensitivity_file",
+        module="sensitivity_risk",
+        description="Load precomputed Greeks from a sensitivity CSV file.",
+        callable_name="src.sensitivity_risk.load_sensitivity_file",
+        handler=load_sensitivity_file,
+    ),
+    RiskTool(
+        name="validate_sensitivity_file",
+        module="sensitivity_risk",
+        description="Validate supplied precomputed Greeks records before aggregation.",
+        callable_name="src.sensitivity_risk.validate_sensitivity_file",
+        handler=validate_sensitivity_file,
+    ),
+    RiskTool(
+        name="aggregate_greeks",
+        module="sensitivity_risk",
+        description="Aggregate supplied delta, gamma, vega, and theta sensitivities.",
+        callable_name="src.sensitivity_risk.aggregate_greeks",
+        handler=aggregate_greeks,
     ),
     RiskTool(
         name="validate_portfolio",
@@ -133,7 +157,13 @@ def list_registered_tools() -> list[RiskTool]:
 
 def list_tools_by_module(module: str) -> list[RiskTool]:
     """Return registered tools belonging to a supported risk module."""
-    supported_modules = {"shared", "market_risk", "credit_risk", "regulatory_risk"}
+    supported_modules = {
+        "shared",
+        "market_risk",
+        "credit_risk",
+        "regulatory_risk",
+        "sensitivity_risk",
+    }
     if module not in supported_modules:
         supported = ", ".join(sorted(supported_modules))
         raise ValueError(

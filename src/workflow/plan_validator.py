@@ -42,11 +42,14 @@ def validate_workflow_plan(plan: WorkflowPlan) -> PlanValidationResult:
     _require_order(tool_names, "validate_portfolio", "calculate_risk_metrics", errors)
     _require_order(tool_names, "load_risk_config", "calculate_risk_metrics", errors)
     _require_order(tool_names, "load_risk_config", "calculate_pfe_metrics", errors)
+    _require_order(tool_names, "load_sensitivity_file", "validate_sensitivity_file", errors)
+    _require_order(tool_names, "validate_sensitivity_file", "aggregate_greeks", errors)
 
     for analytics_tool in (
         "calculate_risk_metrics",
         "calculate_pfe_metrics",
         "run_stress_test",
+        "aggregate_greeks",
     ):
         _require_order(tool_names, analytics_tool, "generate_commentary", errors)
 

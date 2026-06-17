@@ -13,6 +13,7 @@ class WorkflowExecutionContext:
     market_data_file: str | None = None
     credit_data_file: str | None = None
     config_file: str | None = None
+    sensitivity_data_file: str | None = None
     use_llm: bool = False
     selected_route: str | None = None
     loaded_portfolio: dict | None = None
@@ -22,6 +23,8 @@ class WorkflowExecutionContext:
     stress_test_results: list[dict] = field(default_factory=list)
     pfe_result: dict | None = None
     regulatory_readiness: dict | None = None
+    sensitivity_records: Any = None
+    sensitivity_result: dict | None = None
     methodology_notes: list[dict] = field(default_factory=list)
     market_methodology_notes: list[dict] = field(default_factory=list)
     credit_methodology_notes: list[dict] = field(default_factory=list)

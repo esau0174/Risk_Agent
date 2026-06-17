@@ -1,0 +1,5 @@
+portfolio_id,book,trade_id,instrument_type,risk_class,risk_factor,bucket,delta,gamma,vega,theta,currency
+RF-SENS-001,Equity Derivatives,TRD-001,Option,Equity,SPY,US Equity,125000,4500,82000,-1200,USD
+RF-SENS-001,Equity Derivatives,TRD-002,Option,Equity,QQQ,US Equity,98000,3800,76000,-950,USD
+RF-SENS-001,Equity Derivatives,TRD-003,Option,Equity,NVDA,US Single Name,210000,9200,145000,-2100,USD
+RF-SENS-001,Rates Options,TRD-004,Swaption,Rates,USD 10Y,USD Rates,-65000,2500,54000,-700,USD

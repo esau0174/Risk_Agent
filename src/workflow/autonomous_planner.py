@@ -18,6 +18,12 @@ MODULE_ALIASES = {
     "sa-ccr": "regulatory_risk",
     "simm": "regulatory_risk",
     "regim": "regulatory_risk",
+    "sensitivity risk": "sensitivity_risk",
+    "sensitivity_risk": "sensitivity_risk",
+    "sensitivity": "sensitivity_risk",
+    "sensitivities": "sensitivity_risk",
+    "greeks": "sensitivity_risk",
+    "greek": "sensitivity_risk",
 }
 
 
@@ -66,6 +72,15 @@ def propose_autonomous_workflow_plan(
 
     if "regulatory_risk" in modules:
         selected_tools.append("assess_regulatory_readiness")
+
+    if "sensitivity_risk" in modules:
+        selected_tools.extend(
+            [
+                "load_sensitivity_file",
+                "validate_sensitivity_file",
+                "aggregate_greeks",
+            ]
+        )
 
     if any(module in modules for module in ("market_risk", "credit_risk")):
         selected_tools.extend(
