@@ -117,7 +117,8 @@ def test_full_workflow_returns_structured_agent_run_result(monkeypatch):
     assert "SA-CCR readiness: WARNING" in result.user_report
     assert "SIMM / RegIM readiness: WARNING" in result.user_report
     assert "Regulatory capital calculation: Not performed" in result.user_report
-    assert "SA-CCR missing inputs: trade_type, notional" in result.user_report
+    assert "SA-CCR available portfolio metadata:" in result.user_report
+    assert "SA-CCR missing trade-level inputs: trade_type, trade_notional" in result.user_report
     assert "SIMM / RegIM available inputs: none" in result.user_report
     assert "SIMM / RegIM missing inputs: risk_class" in result.user_report
     assert "Validation: PASSED" in result.user_report

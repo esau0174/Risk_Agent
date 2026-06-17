@@ -203,6 +203,22 @@ def test_run_agent_workflow_market_greeks_and_regulatory_uses_sensitivity_readin
     assert "No SIMM margin amount is generated" in result.user_report
     assert "SIMM margin amount: USD" not in result.user_report
     assert result.raw_outputs["regulatory_risk"]["simm_regim"]["status"] == "PARTIAL"
+    assert result.validation_result["sensitivity_risk"]["passed"] is True
+
+
+def test_validation_summary_includes_sensitivity_risk_for_combined_workflow():
+    module = _load_demo_module()
+    result = run_agent_workflow(
+        query="Run market risk, Greeks, and regulatory readiness.",
+        scenario="full",
+        planner_mode="rule",
+    )
+
+    summary = module._validation_summary(result.validation_result)
+
+    assert "- Market Risk: PASSED" in summary
+    assert "- Regulatory Risk: PASSED" in summary
+    assert "- Sensitivity Risk: PASSED" in summary
 
 
 def test_plan_validator_accepts_valid_autonomous_plan():
@@ -331,10 +347,11 @@ def test_run_agent_workflow_full_scenario(monkeypatch):
                 "overall_status": "WARNING",
                 "missing_inputs": [
                     "trade_type",
-                    "notional",
+                    "trade_notional",
                     "maturity",
-                    "asset_class",
                     "supervisory_category",
+                    "netting_agreement_details",
+                    "supervisory_factor_category_mapping",
                     "risk_class",
                     "margin_class",
                     "product_class",
@@ -345,13 +362,24 @@ def test_run_agent_workflow_full_scenario(monkeypatch):
                 ],
                 "sa_ccr": {
                     "status": "WARNING",
+                    "available_portfolio_metadata": [],
+                    "missing_trade_level_inputs": [
+                        "trade_type",
+                        "trade_notional",
+                        "maturity",
+                        "supervisory_category",
+                        "netting_agreement_details",
+                        "supervisory_factor_category_mapping",
+                    ],
                     "missing_required_fields": [
                         "trade_type",
-                        "notional",
+                        "trade_notional",
                         "maturity",
-                        "asset_class",
                         "supervisory_category",
+                        "netting_agreement_details",
+                        "supervisory_factor_category_mapping",
                     ],
+                    "guardrail_note": "Portfolio-level metadata is useful context.",
                 },
                 "simm_regim": {
                     "status": "WARNING",

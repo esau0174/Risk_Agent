@@ -179,7 +179,12 @@ def _validation_summary(validation_result) -> str:
     if isinstance(validation_result, dict):
         status = "PASSED" if validation_result.get("passed") else "FAILED"
         lines = [f"- Validation: {status}"]
-        for name in ("market_risk", "credit_risk", "regulatory_risk"):
+        for name in (
+            "market_risk",
+            "credit_risk",
+            "regulatory_risk",
+            "sensitivity_risk",
+        ):
             domain_result = validation_result.get(name)
             if isinstance(domain_result, dict):
                 domain_status = "PASSED" if domain_result.get("passed") else "FAILED"

@@ -701,6 +701,12 @@ def _build_sensitivity_report(result: dict) -> str:
 
 
 def _build_regulatory_report(readiness: dict, validation_result=None) -> str:
+    sa_ccr = readiness["sa_ccr"]
+    sa_ccr_available = sa_ccr.get("available_portfolio_metadata", [])
+    sa_ccr_missing = sa_ccr.get(
+        "missing_trade_level_inputs",
+        sa_ccr.get("missing_required_fields", []),
+    )
     simm_regim = readiness["simm_regim"]
     simm_available = simm_regim.get("available_inputs", [])
     simm_missing = simm_regim.get(
@@ -709,11 +715,14 @@ def _build_regulatory_report(readiness: dict, validation_result=None) -> str:
     )
     lines = [
         "Regulatory Risk",
-        f"- SA-CCR readiness: {readiness['sa_ccr']['status']}",
+        f"- SA-CCR readiness: {sa_ccr['status']}",
         f"- SIMM / RegIM readiness: {simm_regim['status']}",
         f"- Regulatory capital calculation: {readiness['regulatory_capital_calculation']}",
-        "- SA-CCR missing inputs: "
-        f"{', '.join(readiness['sa_ccr']['missing_required_fields'])}",
+        "- SA-CCR available portfolio metadata: "
+        f"{', '.join(sa_ccr_available) if sa_ccr_available else 'none'}",
+        "- SA-CCR missing trade-level inputs: "
+        f"{', '.join(sa_ccr_missing)}",
+        f"- SA-CCR guardrail: {sa_ccr.get('guardrail_note', readiness['guardrail'])}",
         "- SIMM / RegIM available inputs: "
         f"{', '.join(simm_available) if simm_available else 'none'}",
         "- SIMM / RegIM missing inputs: "

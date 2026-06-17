@@ -9,7 +9,8 @@ def test_assess_regulatory_readiness_reports_missing_fields():
     result = assess_regulatory_readiness({"trade_type": "swap"})
 
     assert result["sa_ccr"]["status"] == "WARNING"
-    assert "notional" in result["sa_ccr"]["missing_required_fields"]
+    assert "trade_notional" in result["sa_ccr"]["missing_trade_level_inputs"]
+    assert "netting_agreement_details" in result["sa_ccr"]["missing_trade_level_inputs"]
     assert result["simm_regim"]["status"] == "WARNING"
     assert "risk_class" in result["missing_inputs"]
     assert "product_class" in result["simm_regim"]["missing_inputs"]
@@ -21,10 +22,11 @@ def test_assess_regulatory_readiness_can_be_ready_when_required_inputs_exist():
     result = assess_regulatory_readiness(
         {
             "trade_type": "swap",
-            "notional": 1_000_000,
+            "trade_notional": 1_000_000,
             "maturity": 5,
-            "asset_class": "rates",
             "supervisory_category": "interest_rate",
+            "netting_agreement_details": "CSA-001",
+            "supervisory_factor_category_mapping": {"rates": "interest_rate"},
             "risk_class": "rates",
             "risk_factor": "USD 10Y",
             "bucket": "USD Rates",
@@ -45,6 +47,30 @@ def test_assess_regulatory_readiness_can_be_ready_when_required_inputs_exist():
     assert result["simm_regim"]["status"] == "READY"
     assert result["overall_status"] == "READY"
     assert result["missing_inputs"] == []
+
+
+def test_sa_ccr_readiness_distinguishes_portfolio_metadata_from_trade_inputs():
+    result = assess_regulatory_readiness(
+        {
+            "portfolio_notional_usd": 10_000_000,
+            "portfolio_asset_classes": ["Equity ETF"],
+        }
+    )
+
+    assert result["sa_ccr"]["status"] == "WARNING"
+    assert result["sa_ccr"]["available_portfolio_metadata"] == [
+        "portfolio_notional",
+        "asset_class",
+    ]
+    assert "trade_notional" in result["sa_ccr"]["missing_trade_level_inputs"]
+    assert "maturity" in result["sa_ccr"]["missing_trade_level_inputs"]
+    assert "supervisory_category" in result["sa_ccr"]["missing_trade_level_inputs"]
+    assert "netting_agreement_details" in result["sa_ccr"]["missing_trade_level_inputs"]
+    assert (
+        "supervisory_factor_category_mapping"
+        in result["sa_ccr"]["missing_trade_level_inputs"]
+    )
+    assert "Portfolio-level metadata" in result["sa_ccr"]["guardrail_note"]
 
 
 def test_assess_regulatory_readiness_uses_supplied_sensitivity_fields():

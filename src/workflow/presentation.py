@@ -127,8 +127,32 @@ def _build_user_report(
                 f"{regulatory_result['regulatory_capital_calculation']}"
             ),
             (
-                "- SA-CCR missing inputs: "
-                + ", ".join(regulatory_result["sa_ccr"]["missing_required_fields"])
+                "- SA-CCR available portfolio metadata: "
+                + (
+                    ", ".join(
+                        regulatory_result["sa_ccr"].get(
+                            "available_portfolio_metadata",
+                            [],
+                        )
+                    )
+                    or "none"
+                )
+            ),
+            (
+                "- SA-CCR missing trade-level inputs: "
+                + ", ".join(
+                    regulatory_result["sa_ccr"].get(
+                        "missing_trade_level_inputs",
+                        regulatory_result["sa_ccr"]["missing_required_fields"],
+                    )
+                )
+            ),
+            (
+                "- SA-CCR guardrail: "
+                + regulatory_result["sa_ccr"].get(
+                    "guardrail_note",
+                    regulatory_result["guardrail"],
+                )
             ),
             (
                 "- SIMM / RegIM available inputs: "

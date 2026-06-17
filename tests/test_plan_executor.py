@@ -36,7 +36,10 @@ class FakeToolExecutor:
                 "missing_inputs": ["trade_type"],
                 "sa_ccr": {
                     "status": "WARNING",
+                    "available_portfolio_metadata": [],
+                    "missing_trade_level_inputs": ["trade_type"],
                     "missing_required_fields": ["trade_type"],
+                    "guardrail_note": "Portfolio-level metadata is useful context.",
                 },
                 "simm_regim": {
                     "status": "WARNING",

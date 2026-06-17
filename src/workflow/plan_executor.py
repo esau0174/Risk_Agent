@@ -225,6 +225,15 @@ def _assess_regulatory_readiness(
         "historical_market_data": "available" if context.risk_report else None,
         "exposure_profile": "available" if context.exposure_profile else None,
     }
+    portfolio_metadata = (
+        context.loaded_portfolio.get("metadata", {})
+        if context.loaded_portfolio
+        else {}
+    )
+    if portfolio_metadata.get("total_notional_usd") is not None:
+        inputs["portfolio_notional_usd"] = portfolio_metadata["total_notional_usd"]
+    if portfolio_metadata.get("asset_classes"):
+        inputs["portfolio_asset_classes"] = portfolio_metadata["asset_classes"]
     if context.sensitivity_records is not None:
         inputs["precomputed_sensitivities"] = "available"
         inputs["sensitivity_fields"] = [

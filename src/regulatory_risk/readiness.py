@@ -3,12 +3,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 
-SA_CCR_REQUIRED_FIELDS = (
+SA_CCR_TRADE_LEVEL_REQUIRED_FIELDS = (
     "trade_type",
-    "notional",
+    "trade_notional",
     "maturity",
-    "asset_class",
     "supervisory_category",
+    "netting_agreement_details",
+    "supervisory_factor_category_mapping",
 )
 
 SIMM_REGIM_SENSITIVITY_FIELDS = (
@@ -33,7 +34,13 @@ SIMM_REGIM_MODEL_FIELDS = (
 def assess_regulatory_readiness(inputs: Mapping | None = None) -> dict:
     """Assess whether inputs are sufficient for downstream regulatory workflows."""
     provided_inputs = dict(inputs or {})
-    sa_ccr_missing = _missing_fields(provided_inputs, SA_CCR_REQUIRED_FIELDS)
+    sa_ccr_available_portfolio_metadata = _available_sa_ccr_portfolio_metadata(
+        provided_inputs
+    )
+    sa_ccr_missing = _missing_fields(
+        provided_inputs,
+        SA_CCR_TRADE_LEVEL_REQUIRED_FIELDS,
+    )
     simm_available = _available_simm_regim_inputs(provided_inputs)
     simm_required_fields = (*SIMM_REGIM_SENSITIVITY_FIELDS, *SIMM_REGIM_MODEL_FIELDS)
     simm_regim_missing = [
@@ -45,7 +52,13 @@ def assess_regulatory_readiness(inputs: Mapping | None = None) -> dict:
     return {
         "sa_ccr": {
             "status": "READY" if not sa_ccr_missing else "WARNING",
+            "available_portfolio_metadata": sa_ccr_available_portfolio_metadata,
+            "missing_trade_level_inputs": sa_ccr_missing,
             "missing_required_fields": sa_ccr_missing,
+            "guardrail_note": (
+                "Portfolio-level metadata is useful context, but it does not "
+                "replace trade-level SA-CCR inputs."
+            ),
         },
         "simm_regim": {
             "status": simm_status,
@@ -73,6 +86,30 @@ def _missing_fields(inputs: Mapping, required_fields: tuple[str, ...]) -> list[s
         for field in required_fields
         if field not in inputs or inputs[field] in (None, "")
     ]
+
+
+def _available_sa_ccr_portfolio_metadata(inputs: Mapping) -> list[str]:
+    available = []
+    if any(
+        inputs.get(field) not in (None, "")
+        for field in (
+            "portfolio_notional",
+            "portfolio_notional_usd",
+            "total_notional_usd",
+            "notional_usd",
+        )
+    ):
+        available.append("portfolio_notional")
+    if any(
+        inputs.get(field) not in (None, "")
+        for field in (
+            "portfolio_asset_class",
+            "portfolio_asset_classes",
+            "asset_class",
+        )
+    ):
+        available.append("asset_class")
+    return available
 
 
 def _available_simm_regim_inputs(inputs: Mapping) -> set[str]:
