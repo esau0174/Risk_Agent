@@ -96,13 +96,15 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
-Run the finalized v1 demo with the deterministic rule planner:
+Run the Core Risk Review with the deterministic rule planner. This uses
+`--scenario full` for backward compatibility and covers Market Risk,
+Counterparty Risk, Regulatory Risk, stress testing, and PFE analysis:
 
 ```bash
 python examples/run_riskflow_agent_demo.py --planner rule --scenario full --show-plan
 ```
 
-The same workflow is available through the installed CLI:
+The same Core Risk Review is available through the installed CLI:
 
 ```bash
 riskflow-agent --planner rule --scenario full --show-plan
@@ -144,6 +146,10 @@ Supported core arguments mirror the primary demo wrapper:
 - `--query "custom request"`
 - `--show-plan`
 - `--trace-file [path]`
+
+`--scenario full` means Core Risk Review: Market Risk + Counterparty Risk +
+Regulatory Risk + Stress/PFE. Sensitivity Risk / Greeks workflows are selected
+through query text such as the examples below.
 
 Example:
 

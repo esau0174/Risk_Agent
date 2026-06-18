@@ -9,7 +9,7 @@ from riskflow_agent import run_agent_workflow
 
 
 PRESETS = {
-    "Full Risk Review": (
+    "Core Risk Review": (
         "Plan a Market Risk, Counterparty Risk, and Regulatory Risk review with "
         "stress testing, PFE exposure analysis, and regulatory readiness screening."
     ),
@@ -22,7 +22,7 @@ PRESETS = {
 }
 
 PRESET_DESCRIPTIONS = {
-    "Full Risk Review": "Market + Counterparty + Regulatory + Stress",
+    "Core Risk Review": "Market + Counterparty + Regulatory + Stress",
     "Market + Sensitivity + Regulatory Risk": (
         "Greeks aggregation feeding SIMM readiness"
     ),
