@@ -51,10 +51,11 @@ def run_cli(
         else 0
     )
     print(f"- Approved tool count: {approved_tool_count}")
-    print(
-        "- Plan validation: "
-        f"{'PASSED' if result.plan_validation_result.passed else 'FAILED'}"
-    )
+    print(f"- Proposed LLM plan status: {_proposed_llm_plan_status(result)}")
+    print(f"- Final executable plan status: {_final_executable_plan_status(result)}")
+    route_mapping_note = result.orchestration_trace.get("route_mapping_note")
+    if route_mapping_note:
+        print(f"- Route mapping note: {route_mapping_note}")
     if result.plan_validation_result.errors:
         print("- Errors: " + "; ".join(result.plan_validation_result.errors))
     if result.plan_validation_result.warnings:
@@ -176,6 +177,22 @@ def _available_input_schemas_text(result) -> str:
     if not result.detected_modules and not result.approved_plan:
         return "unavailable because planning failed"
     return ", ".join(_available_input_schemas(result.detected_modules)) or "none"
+
+
+def _proposed_llm_plan_status(result) -> str:
+    if result.planner_mode != "llm":
+        return "NOT_USED"
+    if not result.plan_validation_result.passed:
+        return "REJECTED"
+    note = result.orchestration_trace.get("route_mapping_note") or ""
+    warnings_text = " ".join(result.plan_validation_result.warnings or [])
+    if "LLM plan incomplete" in note or "LLM plan incomplete" in warnings_text:
+        return "INCOMPLETE"
+    return "COMPLETE"
+
+
+def _final_executable_plan_status(result) -> str:
+    return "PASSED" if result.plan_validation_result.passed else "FAILED"
 
 
 def _validation_summary(validation_result) -> str:

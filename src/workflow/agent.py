@@ -93,8 +93,6 @@ def run_agent_workflow(
     )
     plan = planning["plan"]
     plan_validation_result = validate_workflow_plan(plan)
-    detected_modules = _detect_modules_from_plan(plan)
-    execution_route = _execution_route_from_modules(detected_modules)
 
     if planning["failed"]:
         plan_validation_result = PlanValidationResult(
@@ -102,6 +100,75 @@ def run_agent_workflow(
             errors=[planning["message"]],
             warnings=planning["warnings"],
         )
+        orchestration_trace = _build_orchestration_trace(
+            proposed_plan=plan,
+            approved_plan=None,
+            selected_route=None,
+            execution_trace=[],
+            validation_status="FAILED",
+            execution_mode="not_executed",
+            route_mapping_note="Plan validation failed; execution was not started.",
+        )
+        return AgentWorkflowResult(
+            query=effective_query,
+            scenario=scenario,
+            detected_modules=[],
+            proposed_plan=plan,
+            plan_validation_result=plan_validation_result,
+            approved_plan=None,
+            user_report=None,
+            final_report_summary="Approved Plan: none; execution was not started.",
+            execution_trace=[],
+            validation_result=None,
+            raw_outputs={},
+            planner_mode=planning["mode"],
+            planner_message=planning["message"],
+            planner_warnings=planning["warnings"],
+            orchestration_trace=orchestration_trace,
+        )
+
+    required_tools = _required_tools_for_request(
+        effective_query,
+        available_input_schemas,
+        requested_modules,
+    )
+    missing_required_tools = _missing_required_tools(plan, required_tools)
+    proposed_detected_modules = _detect_modules_from_plan(plan)
+    detected_modules = (
+        _detect_modules_from_required_tools(required_tools)
+        if missing_required_tools
+        else proposed_detected_modules
+    )
+    execution_route = _execution_route_from_modules(detected_modules)
+    approved_plan = plan
+    route_mapping_note_override = None
+
+    if missing_required_tools and not plan_validation_result.errors:
+        missing_text = ", ".join(missing_required_tools)
+        completeness_warning = (
+            "Plan incomplete; missing required tool(s): "
+            f"{missing_text}. Mapped to deterministic {execution_route} route."
+        )
+        if planning["mode"] == "llm":
+            completeness_warning = (
+                "LLM "
+                + completeness_warning[0].lower()
+                + completeness_warning[1:]
+            )
+            approved_plan = propose_autonomous_workflow_plan(
+                effective_query,
+                available_input_schemas=available_input_schemas,
+                requested_modules=detected_modules,
+                registered_tool_names=[
+                    tool.name for tool in list_registered_tools()
+                ],
+            )
+            plan_validation_result = validate_workflow_plan(approved_plan)
+            plan_validation_result.warnings.append(completeness_warning)
+            route_mapping_note_override = completeness_warning
+        else:
+            plan_validation_result.errors.append(completeness_warning)
+            plan_validation_result.passed = False
 
     if not plan_validation_result.passed:
         orchestration_trace = _build_orchestration_trace(
@@ -131,10 +198,17 @@ def run_agent_workflow(
             orchestration_trace=orchestration_trace,
         )
 
-    executed = _execute_approved_plan_or_route(plan, execution_route, effective_query, scenario)
+    executed = _execute_approved_plan_or_route(
+        approved_plan,
+        execution_route,
+        effective_query,
+        scenario,
+        force_route_fallback=route_mapping_note_override is not None,
+        route_mapping_note_override=route_mapping_note_override,
+    )
     orchestration_trace = _build_orchestration_trace(
         proposed_plan=plan,
-        approved_plan=plan,
+        approved_plan=approved_plan,
         selected_route=executed["selected_route"],
         execution_trace=executed["execution_trace"],
         validation_status="PASSED",
@@ -148,7 +222,7 @@ def run_agent_workflow(
         detected_modules=detected_modules,
         proposed_plan=plan,
         plan_validation_result=plan_validation_result,
-        approved_plan=plan,
+        approved_plan=approved_plan,
         user_report=executed["user_report"],
         final_report_summary=executed["final_report_summary"],
         execution_trace=executed["execution_trace"],
@@ -352,6 +426,8 @@ def _execute_approved_plan_or_route(
     execution_route: str,
     effective_query: str,
     scenario: str,
+    force_route_fallback: bool = False,
+    route_mapping_note_override: str | None = None,
 ) -> dict:
     context = WorkflowExecutionContext(
         user_query=effective_query,
@@ -366,6 +442,10 @@ def _execute_approved_plan_or_route(
     plan_executor = ApprovedPlanExecutor()
 
     try:
+        if force_route_fallback:
+            raise PlanExecutionNotSupported(
+                "Approved plan intentionally mapped to deterministic route fallback."
+            )
         if not plan_executor.can_execute(plan, context):
             raise PlanExecutionNotSupported(
                 "Approved plan contains steps that are not mapped for direct execution."
@@ -384,7 +464,8 @@ def _execute_approved_plan_or_route(
         executed = _execute_approved_route(execution_route)
         executed["execution_mode"] = "deterministic_route_fallback"
         executed["route_mapping_note"] = (
-            "Approved plan mapped to deterministic route fallback."
+            route_mapping_note_override
+            or "Approved plan mapped to deterministic route fallback."
         )
         executed["selected_route"] = execution_route
         executed["skipped_or_unsupported_tools"] = []
@@ -504,12 +585,116 @@ def _validation_result_as_dict(validation_result) -> dict:
     return {"passed": bool(getattr(validation_result, "passed", False))}
 
 
+def _required_tools_for_request(
+    query: str,
+    available_input_schemas: list[str],
+    requested_modules: list[str] | None,
+) -> list[str]:
+    normalized = query.lower()
+    schemas = set(available_input_schemas)
+    modules = {module.lower() for module in requested_modules or []}
+    required: list[str] = []
+
+    market_requested = (
+        "market risk" in modules
+        or "market_portfolio" in schemas
+        or any(
+            term in normalized
+            for term in (
+                "market risk",
+                "portfolio risk",
+                "portfolio",
+                "var",
+                "volatility",
+                "drawdown",
+                "downside",
+            )
+        )
+    )
+    stress_requested = any(
+        term in normalized for term in ("stress", "shock", "scenario", "selloff")
+    )
+    counterparty_requested = (
+        "credit risk" in modules
+        or "counterparty risk" in modules
+        or "exposure_profile" in schemas
+        or any(
+            term in normalized
+            for term in ("counterparty", "credit risk", "pfe", "exposure profile")
+        )
+    )
+    regulatory_requested = (
+        "regulatory risk" in modules
+        or any(
+            term in normalized
+            for term in ("regulatory", "readiness", "sa-ccr", "simm", "regim")
+        )
+    )
+    sensitivity_requested = (
+        "sensitivity risk" in modules
+        or "sensitivity_file" in schemas
+        or any(
+            term in normalized
+            for term in ("greek", "greeks", "sensitivity", "sensitivities")
+        )
+    )
+
+    if market_requested or stress_requested:
+        required.extend(
+            ["load_portfolio_file", "validate_portfolio", "calculate_risk_metrics"]
+        )
+    if stress_requested:
+        required.append("run_stress_test")
+    if counterparty_requested:
+        required.extend(["load_exposure_profile", "calculate_pfe_metrics"])
+    if sensitivity_requested:
+        required.extend(
+            ["load_sensitivity_file", "validate_sensitivity_file", "aggregate_greeks"]
+        )
+    if regulatory_requested:
+        required.append("assess_regulatory_readiness")
+
+    return _dedupe(required)
+
+
+def _missing_required_tools(plan: WorkflowPlan, required_tools: list[str]) -> list[str]:
+    tool_names = {step.tool_name for step in plan.steps}
+    return [tool_name for tool_name in required_tools if tool_name not in tool_names]
+
+
+def _detect_modules_from_required_tools(required_tools: list[str]) -> list[str]:
+    tools = set(required_tools)
+    modules: list[str] = []
+    if tools & {"calculate_risk_metrics", "run_stress_test"}:
+        modules.append("Market Risk")
+    if "calculate_pfe_metrics" in tools:
+        modules.append("Credit Risk")
+    if "assess_regulatory_readiness" in tools:
+        modules.append("Regulatory Risk")
+    if "aggregate_greeks" in tools:
+        modules.append("Sensitivity Risk")
+    return modules
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    seen = set()
+    deduped = []
+    for value in values:
+        if value not in seen:
+            deduped.append(value)
+            seen.add(value)
+    return deduped
+
+
 def _default_input_schemas_for_query(query: str) -> list[str]:
     normalized = query.lower()
     schemas: list[str] = []
     if any(term in normalized for term in ("market", "portfolio", "var", "stress")):
         schemas.append("market_portfolio")
-    if any(term in normalized for term in ("credit", "pfe", "exposure", "counterparty")):
+    if any(
+        term in normalized
+        for term in ("credit", "pfe", "exposure profile", "counterparty exposure")
+    ):
         schemas.append("exposure_profile")
     if any(term in normalized for term in ("greek", "greeks", "sensitivity", "sensitivities")):
         schemas.append("sensitivity_file")

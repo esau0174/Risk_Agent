@@ -64,6 +64,7 @@ def propose_llm_workflow_plan(
     )
     response = client.responses.create(
         model=model,
+        temperature=0,
         input=[
             {
                 "role": "system",

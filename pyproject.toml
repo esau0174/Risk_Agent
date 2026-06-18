@@ -21,6 +21,9 @@ dependencies = [
 dev = [
     "pytest",
 ]
+ui = [
+    "streamlit>=1.30",
+]
 
 [project.scripts]
 riskflow-agent = "riskflow_agent.cli:main"

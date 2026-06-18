@@ -93,6 +93,8 @@ def test_llm_planner_loads_env_model_and_base_url(monkeypatch):
         "base_url": "https://example.test/v1",
     }
     assert fake_client.responses.last_kwargs["model"] == "test-planner-model"
+    assert fake_client.responses.last_kwargs["temperature"] == 0
+    assert "top_p" not in fake_client.responses.last_kwargs
 
 
 def test_autonomous_planner_proposes_all_requested_risk_modules():
@@ -762,6 +764,57 @@ def test_llm_planner_valid_full_plan(monkeypatch):
     assert "Combined Executive Summary" in result.user_report
 
 
+def test_incomplete_llm_full_plan_maps_to_deterministic_full_route(monkeypatch):
+    monkeypatch.setattr(
+        agent_module,
+        "run_full_risk_agent_workflow",
+        lambda *args, **kwargs: SimpleNamespace(
+            user_report="Combined Executive Summary\nMarket Risk\nCredit Risk\nRegulatory Risk",
+            execution_trace=[
+                {"tool_name": "calculate_risk_metrics"},
+                {"tool_name": "calculate_pfe_metrics"},
+                {"tool_name": "assess_regulatory_readiness"},
+            ],
+            validation_result={"passed": True},
+            raw_outputs={},
+        ),
+    )
+    client = _FakeLLMClient(
+        _llm_payload(
+            ["Market Risk"],
+            [
+                "load_portfolio_file",
+                "validate_portfolio",
+                "load_risk_config",
+                "calculate_risk_metrics",
+                "retrieve_methodology",
+                "generate_commentary",
+                "validate_report",
+            ],
+        )
+    )
+
+    result = run_agent_workflow(scenario="full", planner_mode="llm", planner_client=client)
+
+    proposed_tools = [step.tool_name for step in result.proposed_plan.steps]
+    approved_tools = [step.tool_name for step in result.approved_plan.steps]
+
+    assert result.plan_validation_result.passed is True
+    assert result.orchestration_trace["selected_route"] == "full"
+    assert result.orchestration_trace["execution_mode"] == "deterministic_route_fallback"
+    assert "LLM plan incomplete" in result.orchestration_trace["route_mapping_note"]
+    assert "calculate_pfe_metrics" not in proposed_tools
+    assert "assess_regulatory_readiness" not in proposed_tools
+    assert "run_stress_test" in approved_tools
+    assert "load_exposure_profile" in approved_tools
+    assert "calculate_pfe_metrics" in approved_tools
+    assert "assess_regulatory_readiness" in approved_tools
+    assert any(
+        "LLM plan incomplete" in warning
+        for warning in result.plan_validation_result.warnings
+    )
+
+
 def test_llm_planner_rejects_unsupported_regulatory_capital_tool():
     client = _FakeLLMClient(
         _llm_payload(
@@ -1039,10 +1092,76 @@ def test_primary_demo_llm_failure_does_not_display_stale_market_context(
     output = capsys.readouterr().out
     assert "Requested modules: unavailable because planning failed" in output
     assert "Available input schemas: unavailable because planning failed" in output
-    assert "Plan validation: FAILED" in output
+    assert "Proposed LLM plan status: REJECTED" in output
+    assert "Final executable plan status: FAILED" in output
     assert "Approved Plan: none; execution was not started." in output
     assert "Requested modules: Market Risk" not in output
     assert "Available input schemas: market_portfolio" not in output
+
+
+def test_primary_demo_incomplete_llm_plan_distinguishes_final_status(
+    monkeypatch,
+    capsys,
+):
+    module = _load_demo_module()
+    proposed_plan = WorkflowPlan(
+        objective="LLM-proposed incomplete plan.",
+        steps=[
+            WorkflowStep(
+                name="calculate_risk_metrics",
+                description="Calculate market risk only.",
+                status="proposed",
+                tool_name="calculate_risk_metrics",
+            )
+        ],
+    )
+    approved_plan = propose_autonomous_workflow_plan(
+        AGENT_SCENARIOS["full"].query,
+        available_input_schemas=AGENT_SCENARIOS["full"].available_input_schemas,
+        requested_modules=AGENT_SCENARIOS["full"].requested_modules,
+    )
+    incomplete_result = AgentWorkflowResult(
+        query=AGENT_SCENARIOS["full"].query,
+        scenario="full",
+        detected_modules=["Market Risk", "Credit Risk", "Regulatory Risk"],
+        proposed_plan=proposed_plan,
+        plan_validation_result=SimpleNamespace(
+            passed=True,
+            errors=[],
+            warnings=[
+                "LLM plan incomplete; missing required tool(s): calculate_pfe_metrics. "
+                "Mapped to deterministic full route."
+            ],
+        ),
+        approved_plan=approved_plan,
+        user_report="Combined Executive Summary\nMarket Risk\nCredit Risk\nRegulatory Risk",
+        final_report_summary="- Final report sections: full",
+        execution_trace=[],
+        validation_result={"passed": True},
+        raw_outputs={},
+        planner_mode="llm",
+        planner_message="LLM planner with deterministic validation",
+        planner_warnings=[],
+        orchestration_trace={
+            "execution_mode": "deterministic_route_fallback",
+            "selected_route": "full",
+            "executed_tools": [],
+            "skipped_or_unsupported_tools": [],
+            "route_mapping_note": (
+                "LLM plan incomplete; missing required tool(s): calculate_pfe_metrics. "
+                "Mapped to deterministic full route."
+            ),
+        },
+    )
+    monkeypatch.setattr(module, "run_agent_workflow", lambda **kwargs: incomplete_result)
+
+    module.main(["--planner", "llm", "--scenario", "full", "--show-plan"])
+
+    output = capsys.readouterr().out
+    assert "Proposed LLM plan status: INCOMPLETE" in output
+    assert "Final executable plan status: PASSED" in output
+    assert "Execution mode: deterministic_route_fallback" in output
+    assert "Route mapping note: LLM plan incomplete" in output
 
 
 def _fake_run_agent_workflow(

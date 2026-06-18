@@ -166,6 +166,17 @@ result = run_agent_workflow(
 print(result.user_report)
 ```
 
+## Optional Streamlit UI
+
+RiskFlow Agent also includes a minimal optional Streamlit inspection view:
+
+```bash
+pip install -e ".[ui]"
+streamlit run apps/streamlit_app.py
+```
+
+The UI calls the same `run_agent_workflow()` API as the CLI and Python library. It is an interactive inspection layer over the structured result: executive report, approved plan, validation and guardrails, execution trace, and optional raw outputs. The CLI and Python API remain the canonical reusable interfaces.
+
 ## Optional LLM Usage
 
 Planner modes:

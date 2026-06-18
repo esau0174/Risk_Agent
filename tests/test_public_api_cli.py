@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
+import sys
 from pathlib import Path
 
 from riskflow_agent import run_agent_workflow, run_risk_workflow
@@ -10,6 +12,28 @@ from riskflow_agent.cli import main as cli_main
 def test_public_api_exports_workflow_entry_points():
     assert callable(run_agent_workflow)
     assert callable(run_risk_workflow)
+
+
+def test_public_package_imports_outside_repo_root(tmp_path):
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "from riskflow_agent import run_agent_workflow, run_risk_workflow; "
+            "print(run_agent_workflow); print(run_risk_workflow)"
+        ),
+    ]
+
+    result = subprocess.run(
+        command,
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "run_agent_workflow" in result.stdout
+    assert "run_risk_workflow" in result.stdout
 
 
 def test_cli_regulatory_smoke_path(capsys):
