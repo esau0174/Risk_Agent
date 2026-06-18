@@ -64,7 +64,17 @@ def _workflow_result(route: str) -> WorkflowResult:
                     "historical_var": 0.0232,
                     "expected_shortfall": 0.0347,
                     "max_drawdown": 0.2377,
-                }
+                },
+                "metadata": {
+                    "portfolio_metadata": {
+                        "asset_classes": [
+                            "Equity ETF",
+                            "Single Name Equity",
+                            "Fixed Income ETF",
+                        ],
+                        "total_notional_usd": 10_000_000.0,
+                    }
+                },
             }
             if is_market
             else None
@@ -117,7 +127,10 @@ def test_full_workflow_returns_structured_agent_run_result(monkeypatch):
     assert "SA-CCR readiness: WARNING" in result.user_report
     assert "SIMM / RegIM readiness: WARNING" in result.user_report
     assert "Regulatory capital calculation: Not performed" in result.user_report
-    assert "SA-CCR available portfolio metadata:" in result.user_report
+    assert (
+        "SA-CCR available portfolio metadata: portfolio_notional, asset_class"
+        in result.user_report
+    )
     assert "SA-CCR missing trade-level inputs: trade_type, trade_notional" in result.user_report
     assert "SIMM / RegIM available inputs: none" in result.user_report
     assert "SIMM / RegIM missing inputs: risk_class" in result.user_report
@@ -135,6 +148,9 @@ def test_full_workflow_returns_structured_agent_run_result(monkeypatch):
     assert result.raw_outputs["market_risk"]["risk_report"] is not None
     assert result.raw_outputs["credit_risk"]["pfe_result"] is not None
     assert result.raw_outputs["regulatory_risk"]["overall_status"] == "WARNING"
+    assert result.raw_outputs["regulatory_risk"]["sa_ccr"][
+        "available_portfolio_metadata"
+    ] == ["portfolio_notional", "asset_class"]
 
 
 def test_combined_trace_preserves_credit_exposure_loading_display_name():

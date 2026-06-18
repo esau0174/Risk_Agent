@@ -5,10 +5,13 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+from src.report_validator import ValidationResult
 from src.workflow import (
     AgentWorkflowResult,
     AGENT_SCENARIOS,
+    ExecutionTraceEntry,
     WorkflowPlan,
+    WorkflowResult,
     WorkflowStep,
     propose_autonomous_workflow_plan,
     run_agent_workflow,
@@ -16,6 +19,7 @@ from src.workflow import (
 )
 import src.workflow.agent as agent_module
 import src.workflow.llm_planner as llm_planner
+import src.workflow.presentation as presentation
 
 
 class _FakeResponse:
@@ -478,18 +482,32 @@ def test_run_agent_workflow_full_scenario(monkeypatch):
 
 
 def _market_result():
-    return SimpleNamespace(
+    return WorkflowResult(
+        query="Analyze market risk",
+        plan=WorkflowPlan(objective="Market", steps=[]),
+        active_modules=["shared", "market_risk"],
+        parsed_portfolio={"tickers": ["SPY"], "weights": [1.0]},
         risk_report={
             "risk_metrics": {
                 "annualized_volatility": 0.2671,
                 "historical_var": 0.0232,
                 "expected_shortfall": 0.0347,
                 "max_drawdown": 0.2377,
-            }
+            },
+            "metadata": {
+                "portfolio_metadata": {
+                    "asset_classes": [
+                        "Equity ETF",
+                        "Single Name Equity",
+                        "Fixed Income ETF",
+                    ],
+                    "total_notional_usd": 10_000_000.0,
+                }
+            },
         },
         stress_test_results=[{"portfolio_loss_pct": 0.225}],
         execution_trace=[
-            SimpleNamespace(
+            ExecutionTraceEntry(
                 step_number=1,
                 tool_name="calculate_risk_metrics",
                 status="success",
@@ -498,13 +516,26 @@ def _market_result():
                 error=None,
             )
         ],
-        validation_result=SimpleNamespace(passed=True),
+        pfe_result=None,
+        methodology_notes=[],
+        validation_result=ValidationResult(
+            passed=True,
+            checks=[],
+            errors=[],
+            warnings=[],
+        ),
         llm_commentary="Market risk commentary.",
+        warnings=[],
     )
 
 
 def _credit_result():
-    return SimpleNamespace(
+    return WorkflowResult(
+        query="Analyze credit risk",
+        plan=WorkflowPlan(objective="Credit", steps=[]),
+        active_modules=["shared", "credit_risk"],
+        parsed_portfolio=None,
+        risk_report=None,
         pfe_result={
             "peak_pfe_95": 2_100_000.0,
             "peak_pfe_99": 2_600_000.0,
@@ -514,8 +545,9 @@ def _credit_result():
             "limit_utilization": 0.84,
             "limit_status": "PASSED",
         },
+        stress_test_results=[],
         execution_trace=[
-            SimpleNamespace(
+            ExecutionTraceEntry(
                 step_number=1,
                 tool_name="calculate_pfe_metrics",
                 status="success",
@@ -524,8 +556,15 @@ def _credit_result():
                 error=None,
             )
         ],
-        validation_result=SimpleNamespace(passed=True),
+        methodology_notes=[],
+        validation_result=ValidationResult(
+            passed=True,
+            checks=[],
+            errors=[],
+            warnings=[],
+        ),
         llm_commentary="Credit risk commentary.",
+        warnings=[],
     )
 
 
@@ -765,19 +804,16 @@ def test_llm_planner_valid_full_plan(monkeypatch):
 
 
 def test_incomplete_llm_full_plan_maps_to_deterministic_full_route(monkeypatch):
+    workflow_results = iter([_market_result(), _credit_result()])
+    monkeypatch.setattr(
+        presentation,
+        "run_risk_workflow",
+        lambda *args, **kwargs: next(workflow_results),
+    )
     monkeypatch.setattr(
         agent_module,
         "run_full_risk_agent_workflow",
-        lambda *args, **kwargs: SimpleNamespace(
-            user_report="Combined Executive Summary\nMarket Risk\nCredit Risk\nRegulatory Risk",
-            execution_trace=[
-                {"tool_name": "calculate_risk_metrics"},
-                {"tool_name": "calculate_pfe_metrics"},
-                {"tool_name": "assess_regulatory_readiness"},
-            ],
-            validation_result={"passed": True},
-            raw_outputs={},
-        ),
+        presentation.run_full_risk_agent_workflow,
     )
     client = _FakeLLMClient(
         _llm_payload(
@@ -809,6 +845,13 @@ def test_incomplete_llm_full_plan_maps_to_deterministic_full_route(monkeypatch):
     assert "load_exposure_profile" in approved_tools
     assert "calculate_pfe_metrics" in approved_tools
     assert "assess_regulatory_readiness" in approved_tools
+    assert (
+        "SA-CCR available portfolio metadata: portfolio_notional, asset_class"
+        in result.user_report
+    )
+    assert result.raw_outputs["regulatory_risk"]["sa_ccr"][
+        "available_portfolio_metadata"
+    ] == ["portfolio_notional", "asset_class"]
     assert any(
         "LLM plan incomplete" in warning
         for warning in result.plan_validation_result.warnings

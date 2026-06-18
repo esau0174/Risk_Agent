@@ -29,7 +29,7 @@ def run_full_risk_agent_workflow(
         config_file=config_file,
         use_llm=use_llm,
     )
-    regulatory_result = _assess_regulatory_readiness()
+    regulatory_result = _assess_regulatory_readiness(market_result)
     user_report_for_validation = _build_user_report(
         market_result,
         credit_result,
@@ -316,14 +316,25 @@ def _market_metadata_lines(metadata: dict) -> list[str]:
     return lines
 
 
-def _assess_regulatory_readiness() -> dict:
+def _assess_regulatory_readiness(market_result: WorkflowResult) -> dict:
+    inputs = {
+        "portfolio_weights": "available",
+        "historical_market_data": "available",
+        "exposure_profile": "available",
+    }
+    portfolio_metadata = (
+        market_result.risk_report.get("metadata", {}).get("portfolio_metadata", {})
+        if market_result.risk_report
+        else {}
+    )
+    if portfolio_metadata.get("total_notional_usd") is not None:
+        inputs["portfolio_notional_usd"] = portfolio_metadata["total_notional_usd"]
+    if portfolio_metadata.get("asset_classes"):
+        inputs["portfolio_asset_classes"] = portfolio_metadata["asset_classes"]
+
     result = ToolExecutor().execute(
         "assess_regulatory_readiness",
-        {
-            "portfolio_weights": "available",
-            "historical_market_data": "available",
-            "exposure_profile": "available",
-        },
+        inputs,
     )
     if result.status != "success":
         raise RuntimeError(
