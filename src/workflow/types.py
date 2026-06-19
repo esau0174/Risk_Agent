@@ -1,3 +1,5 @@
+"""Workflow dataclasses shared by CLI, API, tests, and UI."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -15,6 +17,8 @@ class AgentRunResult:
 
 @dataclass
 class AgentWorkflowResult:
+    """Structured result returned by the public autonomous workflow API."""
+
     query: str
     scenario: str
     detected_modules: list[str]
@@ -34,6 +38,8 @@ class AgentWorkflowResult:
 
 @dataclass
 class WorkflowStep:
+    """A planned tool step before or during workflow execution."""
+
     name: str
     description: str
     status: str
@@ -43,12 +49,16 @@ class WorkflowStep:
 
 @dataclass
 class WorkflowPlan:
+    """Ordered plan proposed by a planner and checked by validators."""
+
     objective: str
     steps: list[WorkflowStep]
 
 
 @dataclass
 class ExecutionTraceEntry:
+    """Runtime trace entry for deterministic workflow execution."""
+
     step_number: int
     tool_name: str
     status: str
@@ -59,6 +69,8 @@ class ExecutionTraceEntry:
 
 @dataclass
 class WorkflowResult:
+    """Domain workflow result used by the lower-level deterministic engine."""
+
     query: str
     plan: WorkflowPlan
     execution_trace: list[ExecutionTraceEntry]

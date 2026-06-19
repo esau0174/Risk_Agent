@@ -1,3 +1,9 @@
+"""Regulatory readiness screening for downstream SA-CCR and SIMM workflows.
+
+This module checks input completeness only. It intentionally does not calculate
+SA-CCR EAD, SIMM margin, RegIM, or regulatory capital.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -32,7 +38,7 @@ SIMM_REGIM_MODEL_FIELDS = (
 
 
 def assess_regulatory_readiness(inputs: Mapping | None = None) -> dict:
-    """Assess whether inputs are sufficient for downstream regulatory workflows."""
+    """Assess available and missing inputs without producing capital numbers."""
     provided_inputs = dict(inputs or {})
     sa_ccr_available_portfolio_metadata = _available_sa_ccr_portfolio_metadata(
         provided_inputs
@@ -89,6 +95,7 @@ def _missing_fields(inputs: Mapping, required_fields: tuple[str, ...]) -> list[s
 
 
 def _available_sa_ccr_portfolio_metadata(inputs: Mapping) -> list[str]:
+    """Report portfolio-level metadata separately from trade-level inputs."""
     available = []
     if any(
         inputs.get(field) not in (None, "")

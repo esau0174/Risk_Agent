@@ -1,3 +1,5 @@
+"""Validation for regulatory readiness reports and guardrails."""
+
 from __future__ import annotations
 
 import re
@@ -9,7 +11,7 @@ def validate_regulatory_readiness_report(
     report_text: str,
     readiness_result: dict,
 ) -> ValidationResult:
-    """Validate that regulatory readiness output does not imply unsupported capital."""
+    """Validate that readiness output does not imply unsupported capital."""
     checks: list[ValidationCheck] = []
     errors: list[str] = []
     warnings: list[str] = []

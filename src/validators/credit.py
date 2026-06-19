@@ -1,3 +1,5 @@
+"""Counterparty/PFE consistency checks for generated commentary."""
+
 from __future__ import annotations
 
 import re
@@ -12,6 +14,7 @@ def validate_pfe_result_consistency(
     commentary: str,
     pfe_result,
 ) -> None:
+    """Check that commentary describes supplied PFE metrics accurately."""
     if pfe_result is None:
         return
     pfe_errors = _pfe_result_consistency_errors(

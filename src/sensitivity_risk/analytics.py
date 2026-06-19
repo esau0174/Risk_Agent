@@ -1,3 +1,10 @@
+"""Aggregation of supplied sensitivity/Greeks records.
+
+RiskFlow Agent consumes precomputed Greeks from an upstream pricing or risk
+engine. It validates and aggregates those records, but does not calculate
+pricing-model Greeks.
+"""
+
 from __future__ import annotations
 
 from collections import defaultdict

@@ -1,3 +1,5 @@
+"""Rule-based planner used for reproducible offline workflow proposals."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence

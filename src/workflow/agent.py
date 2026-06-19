@@ -1,3 +1,10 @@
+"""Top-level autonomous workflow orchestration for RiskFlow Agent.
+
+This module keeps planning, validation, execution, and presentation assembly
+separate so an LLM can propose a workflow without bypassing deterministic risk
+tools or validation gates.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -66,7 +73,7 @@ def run_agent_workflow(
     planner_mode: str = "auto",
     planner_client=None,
 ) -> AgentWorkflowResult:
-    """Run the policy-constrained autonomous planning workflow."""
+    """Run planning, deterministic execution, validation, and report assembly."""
     if scenario not in AGENT_SCENARIOS:
         supported = ", ".join(sorted(AGENT_SCENARIOS))
         raise ValueError(f"Unknown scenario '{scenario}'. Supported scenarios: {supported}.")
@@ -94,6 +101,7 @@ def run_agent_workflow(
     plan = planning["plan"]
     plan_validation_result = validate_workflow_plan(plan)
 
+    # LLM mode fails closed: no stale scenario defaults or partial plans are executed.
     if planning["failed"]:
         plan_validation_result = PlanValidationResult(
             passed=False,
@@ -143,6 +151,8 @@ def run_agent_workflow(
     approved_plan = plan
     route_mapping_note_override = None
 
+    # Completeness is a second gate after syntactic plan validation. It catches
+    # under-scoped LLM plans, then maps them to a deterministic route when safe.
     if missing_required_tools and not plan_validation_result.errors:
         missing_text = ", ".join(missing_required_tools)
         completeness_warning = (
@@ -244,6 +254,7 @@ def _build_plan(
     planner_mode: str,
     planner_client,
 ) -> dict:
+    """Select the requested planner and return a proposed WorkflowPlan."""
     if proposed_plan is not None:
         return {
             "plan": proposed_plan,
@@ -283,6 +294,8 @@ def _build_plan(
             client=planner_client,
         )
     except Exception as exc:
+        # Auto mode remains demo-friendly by falling back to rule planning; explicit
+        # llm mode surfaces the failure and prevents execution.
         if planner_mode == "auto":
             return _rule_planning_result(
                 effective_query,
@@ -429,6 +442,7 @@ def _execute_approved_plan_or_route(
     force_route_fallback: bool = False,
     route_mapping_note_override: str | None = None,
 ) -> dict:
+    """Prefer direct approved-plan execution; retain route fallback for control."""
     context = WorkflowExecutionContext(
         user_query=effective_query,
         scenario=scenario,
@@ -461,6 +475,8 @@ def _execute_approved_plan_or_route(
         executed["skipped_or_unsupported_tools"] = []
         return executed
     except PlanExecutionNotSupported:
+        # The fallback is intentionally conservative: known scenario routes run
+        # deterministic workflows when a validated plan cannot be executed directly.
         executed = _execute_approved_route(execution_route)
         executed["execution_mode"] = "deterministic_route_fallback"
         executed["route_mapping_note"] = (
@@ -473,6 +489,7 @@ def _execute_approved_plan_or_route(
 
 
 def _outputs_from_plan_context(context: WorkflowExecutionContext) -> dict:
+    """Convert execution context state into user report and raw output sections."""
     raw_outputs: dict = {}
     user_report_sections: list[str] = []
     final_sections: list[str] = []
@@ -590,6 +607,7 @@ def _required_tools_for_request(
     available_input_schemas: list[str],
     requested_modules: list[str] | None,
 ) -> list[str]:
+    """Infer the minimum tools needed to satisfy the requested risk scope."""
     normalized = query.lower()
     schemas = set(available_input_schemas)
     modules = {module.lower() for module in requested_modules or []}
@@ -940,6 +958,7 @@ def _build_orchestration_trace(
     route_mapping_note: str,
     skipped_or_unsupported_tools: list[str] | None = None,
 ) -> dict:
+    """Build the high-level audit trace comparing proposed, approved, and run tools."""
     proposed_plan_steps = _plan_tool_names(proposed_plan)
     approved_plan_steps = _plan_tool_names(approved_plan)
     executed_tools = _clean_tool_names(

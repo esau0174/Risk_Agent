@@ -1,3 +1,9 @@
+"""Approved action space for RiskFlow Agent.
+
+The planner may only propose these registered tools, and the executor resolves
+tool names through this registry rather than arbitrary function calls.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -25,6 +31,8 @@ from src.sensitivity_risk.validator import validate_sensitivity_file
 
 @dataclass(frozen=True)
 class RiskTool:
+    """Metadata and handler for one approved deterministic capability."""
+
     name: str
     module: str
     description: str
@@ -151,7 +159,7 @@ _TOOL_BY_NAME = {tool.name: tool for tool in _REGISTERED_TOOLS}
 
 
 def list_registered_tools() -> list[RiskTool]:
-    """Return the deterministic set of risk tools exposed to the workflow."""
+    """Return the deterministic set of tools exposed to planners."""
     return list(_REGISTERED_TOOLS)
 
 
@@ -173,7 +181,7 @@ def list_tools_by_module(module: str) -> list[RiskTool]:
 
 
 def get_tool(name: str) -> RiskTool:
-    """Return a registered risk tool by name."""
+    """Return a registered risk tool by name or raise a clear error."""
     try:
         return _TOOL_BY_NAME[name]
     except KeyError as exc:

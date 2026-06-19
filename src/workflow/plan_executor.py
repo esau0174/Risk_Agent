@@ -1,3 +1,10 @@
+"""Sequential executor for validated RiskFlow workflow plans.
+
+The executor maps approved tool names to explicit context adapters. This keeps
+execution auditable and prevents arbitrary model-generated code or unsupported
+tools from running.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -36,7 +43,7 @@ class PlanExecutionNotSupported(RuntimeError):
 
 @dataclass
 class ApprovedPlanExecutor:
-    """Sequential executor for already-validated workflow plans."""
+    """Run supported plan steps through the registered tool executor."""
 
     tool_executor: ToolExecutor | None = None
 
@@ -45,6 +52,7 @@ class ApprovedPlanExecutor:
             self.tool_executor = ToolExecutor()
 
     def can_execute(self, plan: WorkflowPlan, context: WorkflowExecutionContext) -> bool:
+        """Return whether every plan step has a safe context adapter."""
         tool_names = [step.tool_name for step in plan.steps]
         if any(tool_name not in SUPPORTED_DIRECT_TOOLS for tool_name in tool_names):
             return False
@@ -74,6 +82,7 @@ class ApprovedPlanExecutor:
         plan: WorkflowPlan,
         context: WorkflowExecutionContext,
     ) -> WorkflowExecutionContext:
+        """Execute approved steps in order and mutate the shared context."""
         if not self.can_execute(plan, context):
             raise PlanExecutionNotSupported(
                 "Approved plan cannot be executed directly by the lightweight plan executor."
@@ -89,6 +98,7 @@ class ApprovedPlanExecutor:
         tool_name: str,
         context: WorkflowExecutionContext,
     ) -> None:
+        """Run a single adapter and append a structured execution trace entry."""
         adapter = _ADAPTERS.get(tool_name)
         if adapter is None:
             raise PlanExecutionNotSupported(
@@ -122,6 +132,7 @@ class ApprovedPlanExecutor:
             )
 
     def _run_tool(self, tool_name: str, *args, **kwargs) -> Any:
+        """Execute a registered deterministic tool and raise on tool failure."""
         result = self.tool_executor.execute(tool_name, *args, **kwargs)
         if result.status != "success":
             raise RuntimeError(result.error)
@@ -220,6 +231,8 @@ def _assess_regulatory_readiness(
     executor: ApprovedPlanExecutor,
     context: WorkflowExecutionContext,
 ) -> None:
+    # Regulatory readiness consumes whatever validated workflow context exists.
+    # It reports missing inputs rather than inventing capital or margin numbers.
     inputs = {
         "portfolio_weights": "available" if context.loaded_portfolio else None,
         "historical_market_data": "available" if context.risk_report else None,
@@ -333,6 +346,7 @@ def _retrieve_methodology(executor: ApprovedPlanExecutor, context: WorkflowExecu
 
 
 def _generate_commentary(executor: ApprovedPlanExecutor, context: WorkflowExecutionContext) -> None:
+    """Generate narrative after deterministic analytics have populated context."""
     commentary_parts = []
     if context.risk_report is not None:
         kwargs = {}
@@ -371,6 +385,7 @@ def _generate_commentary(executor: ApprovedPlanExecutor, context: WorkflowExecut
 
 
 def _validate_report(executor: ApprovedPlanExecutor, context: WorkflowExecutionContext) -> None:
+    """Validate generated commentary against deterministic analytics outputs."""
     if context.risk_report is not None:
         kwargs = {}
         if context.stress_test_results:

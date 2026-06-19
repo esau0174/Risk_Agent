@@ -1,3 +1,5 @@
+"""Small execution layer for registered RiskFlow tools."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -8,6 +10,8 @@ from src.core.tool_registry import RiskTool, list_registered_tools
 
 @dataclass
 class ToolResult:
+    """Structured result of a registered tool invocation."""
+
     tool_name: str
     status: str
     output: Any = None
@@ -23,6 +27,7 @@ class ToolExecutor:
         self._tools = {tool.name: tool for tool in registered_tools}
 
     def execute(self, tool_name: str, *args, **kwargs) -> ToolResult:
+        """Run a registered handler and capture success or failure."""
         tool = self._tools.get(tool_name)
         if tool is None:
             available_tools = ", ".join(self._tools)

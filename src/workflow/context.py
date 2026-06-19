@@ -1,3 +1,5 @@
+"""Shared mutable state for approved-plan execution."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -6,7 +8,7 @@ from typing import Any
 
 @dataclass
 class WorkflowExecutionContext:
-    """Mutable state passed through approved-plan execution."""
+    """Carry loaded inputs, analytics outputs, commentary, and trace state."""
 
     user_query: str
     scenario: str

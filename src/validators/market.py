@@ -1,3 +1,5 @@
+"""Market-risk consistency checks for generated commentary."""
+
 from __future__ import annotations
 
 import math
@@ -42,6 +44,7 @@ def validate_market_metric_consistency(
     percentage_tolerance: float,
     enabled: bool,
 ) -> None:
+    """Check deterministic market metrics and any matching commentary figures."""
     if not enabled:
         return
 

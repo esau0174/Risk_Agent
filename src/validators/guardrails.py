@@ -1,3 +1,5 @@
+"""Policy guardrails for generated risk commentary."""
+
 from __future__ import annotations
 
 import re
@@ -32,6 +34,7 @@ def validate_commentary_guardrails(
     warnings: list[str],
     commentary: str,
 ) -> None:
+    """Reject investment advice, certainty claims, and missing limitations."""
     run_check(
         checks,
         errors,

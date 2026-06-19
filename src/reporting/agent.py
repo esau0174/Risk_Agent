@@ -1,3 +1,9 @@
+"""Commentary generation for calculated RiskFlow outputs.
+
+The reporting layer may use an LLM for narrative explanation, but all numeric
+facts are supplied by deterministic Python tools and later checked by validators.
+"""
+
 from __future__ import annotations
 
 import json
@@ -148,6 +154,7 @@ def _generate_risk_commentary(
     methodology_docs: list[dict],
     stress_results: list[dict] | None = None,
 ) -> str:
+    """Ask the LLM to explain supplied facts without inventing new metrics."""
     facts = _build_commentary_facts(risk_report, methodology_docs, stress_results)
     response = client.responses.create(
         model=model,

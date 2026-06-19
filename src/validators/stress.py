@@ -1,3 +1,5 @@
+"""Stress scenario consistency checks for generated commentary."""
+
 from __future__ import annotations
 
 import re
@@ -13,6 +15,7 @@ def validate_stress_result_consistency(
     stress_results,
     percentage_tolerance: float,
 ) -> None:
+    """Check that commentary stress figures match deterministic stress outputs."""
     if not stress_results:
         return
     stress_errors, stress_warning = _stress_result_consistency_findings(

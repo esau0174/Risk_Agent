@@ -1,3 +1,5 @@
+"""Validation for local methodology grounding."""
+
 from __future__ import annotations
 
 import re
@@ -17,6 +19,7 @@ def validate_methodology_grounding(
     commentary: str,
     methodology_notes,
 ) -> None:
+    """Ensure commentary cites only methodology notes that were retrieved."""
     unsupported_titles = _unsupported_methodology_references(
         commentary,
         methodology_notes,

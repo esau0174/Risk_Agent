@@ -1,3 +1,10 @@
+"""Public report validation entry point.
+
+Validators check generated commentary against deterministic analytics outputs,
+methodology retrieval, and financial guardrails before a report is considered
+safe to present.
+"""
+
 from __future__ import annotations
 
 from src.validators.common import ValidationCheck, ValidationResult

@@ -1,3 +1,9 @@
+"""LLM-backed workflow planner with deterministic JSON validation.
+
+The LLM proposes tool names only. It does not execute tools or calculate risk
+metrics, and every proposal still passes the deterministic plan validator.
+"""
+
 from __future__ import annotations
 
 import json
@@ -51,7 +57,7 @@ def propose_llm_workflow_plan(
     client: Any | None = None,
     model: str | None = None,
 ) -> LLMPlannerProposal:
-    """Ask an LLM to propose a tool plan without executing any tools."""
+    """Ask an LLM to propose a structured tool plan without executing tools."""
     if not isinstance(user_query, str) or not user_query.strip():
         raise ValueError("user_query must be a non-empty string.")
 
@@ -148,7 +154,7 @@ def parse_llm_plan_payload(
     payload: dict,
     registered_tools: list[RiskTool],
 ) -> LLMPlannerProposal:
-    """Convert a JSON-like LLM plan proposal into a WorkflowPlan."""
+    """Convert a JSON-like LLM proposal into internal workflow types."""
     if not isinstance(payload, dict):
         raise LLMPlannerError("LLM planner response must be a JSON object.")
 
@@ -260,6 +266,7 @@ def _create_openai_client():
 
 
 def _planner_system_prompt(registered_tools: list[RiskTool]) -> str:
+    """Build the policy prompt that confines planning to registered tools."""
     tool_names = ", ".join(tool.name for tool in registered_tools)
     return (
         "You are the RiskFlow Agent workflow planner. Return JSON only: no markdown, "

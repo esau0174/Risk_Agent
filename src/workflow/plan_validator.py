@@ -1,3 +1,5 @@
+"""Deterministic validation gate for proposed workflow plans."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -23,12 +25,13 @@ class PlanValidationResult:
 
 
 def validate_workflow_plan(plan: WorkflowPlan) -> PlanValidationResult:
-    """Validate a proposed autonomous plan before any workflow execution."""
+    """Reject unknown, unsupported, or misordered tools before execution."""
     errors: list[str] = []
     warnings: list[str] = []
     tool_names = [step.tool_name for step in plan.steps]
 
     for tool_name in tool_names:
+        # Regulatory capital and margin calculators are intentionally not exposed.
         if _is_unsupported_regulatory_capital_tool(tool_name):
             errors.append(
                 f"Unsupported regulatory capital or margin tool requested: {tool_name}."
