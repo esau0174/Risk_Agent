@@ -106,8 +106,10 @@ def _print_execution_trace_summary(orchestration_trace: dict) -> None:
     print("Execution Trace")
     print(f"- Execution mode: {orchestration_trace.get('execution_mode', 'unknown')}")
     print(f"- Selected route: {orchestration_trace.get('selected_route') or 'none'}")
-    executed_tools = orchestration_trace.get("executed_tools") or []
-    skipped_tools = orchestration_trace.get("skipped_or_unsupported_tools") or []
+    executed_tools = _clean_tool_names(orchestration_trace.get("executed_tools"))
+    skipped_tools = _clean_tool_names(
+        orchestration_trace.get("skipped_or_unsupported_tools")
+    )
     print("- Executed tools:")
     if executed_tools:
         for tool_name in executed_tools:
@@ -132,6 +134,14 @@ def _print_plan(plan, scenario: str) -> None:
         start=1,
     ):
         print(f"{index}. {tool_name} - {description}")
+
+
+def _clean_tool_names(tool_names) -> list[str]:
+    return [
+        str(tool_name)
+        for tool_name in (tool_names or [])
+        if tool_name not in (None, "") and str(tool_name).strip().lower() != "none"
+    ]
 
 
 def _display_steps(plan, scenario: str) -> list[tuple[str, str]]:

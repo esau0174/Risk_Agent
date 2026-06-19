@@ -129,7 +129,11 @@ python examples/failure_cases/run_invalid_portfolio_demo.py
 python examples/failure_cases/run_report_validation_failure_demo.py
 ```
 
-The primary entry point is `examples/run_riskflow_agent_demo.py`. Older focused demos are archived under `examples/legacy/`; reviewers should use the primary entry point rather than the archived legacy demos.
+Primary CLI entry point: `riskflow-agent`.
+
+Public Python API: `run_agent_workflow()`.
+
+`examples/run_riskflow_agent_demo.py` is kept as a compatibility wrapper for older demo commands. Older focused demos are archived under `examples/legacy/`.
 
 ## CLI Usage
 

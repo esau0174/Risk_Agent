@@ -217,7 +217,7 @@ def _render_agent_plan(result, requested_planner_mode: str) -> None:
     else:
         st.info("No approved tool sequence. Execution was not started.")
 
-    skipped_tools = trace.get("skipped_or_unsupported_tools") or []
+    skipped_tools = _clean_tool_names(trace.get("skipped_or_unsupported_tools"))
     st.write("Skipped / unsupported tools")
     st.write(", ".join(skipped_tools) if skipped_tools else "none")
 
@@ -604,10 +604,13 @@ def _execution_trace_rows(execution_trace: list[Any]) -> list[dict[str, Any]]:
         item = _to_jsonable(entry)
         if not isinstance(item, dict):
             continue
+        tool_name = item.get("tool_name")
+        if not _is_real_tool_name(tool_name):
+            continue
         rows.append(
             {
                 "step": item.get("step_number", ""),
-                "tool": _display_tool_name(item.get("tool_name", "")),
+                "tool": _display_tool_name(tool_name),
                 "status": _status_label(item.get("status")),
                 "input summary": item.get("input_summary", ""),
                 "output summary": item.get("output_summary", ""),
@@ -642,6 +645,18 @@ def _format_usd(value: Any) -> str:
         return f"USD {float(value):,.2f}"
     except (TypeError, ValueError):
         return "Not available"
+
+
+def _clean_tool_names(tool_names) -> list[str]:
+    return [
+        str(tool_name)
+        for tool_name in (tool_names or [])
+        if _is_real_tool_name(tool_name)
+    ]
+
+
+def _is_real_tool_name(tool_name: Any) -> bool:
+    return tool_name not in (None, "") and str(tool_name).strip().lower() != "none"
 
 
 def _to_jsonable(value):

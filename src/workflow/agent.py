@@ -942,15 +942,17 @@ def _build_orchestration_trace(
 ) -> dict:
     proposed_plan_steps = _plan_tool_names(proposed_plan)
     approved_plan_steps = _plan_tool_names(approved_plan)
-    executed_tools = [
-        entry.get("tool_name")
-        for entry in execution_trace
-        if isinstance(entry, dict) and entry.get("tool_name")
-    ]
+    executed_tools = _clean_tool_names(
+        [
+            entry.get("tool_name")
+            for entry in execution_trace
+            if isinstance(entry, dict)
+        ]
+    )
     skipped_tools = (
-        skipped_or_unsupported_tools
+        _clean_tool_names(skipped_or_unsupported_tools)
         if skipped_or_unsupported_tools is not None
-        else proposed_plan_steps if approved_plan is None else []
+        else _clean_tool_names(proposed_plan_steps) if approved_plan is None else []
     )
     return {
         "execution_mode": execution_mode,
@@ -968,3 +970,11 @@ def _plan_tool_names(plan: WorkflowPlan | None) -> list[str]:
     if plan is None:
         return []
     return [step.tool_name for step in plan.steps]
+
+
+def _clean_tool_names(tool_names) -> list[str]:
+    return [
+        str(tool_name)
+        for tool_name in (tool_names or [])
+        if tool_name not in (None, "") and str(tool_name).strip().lower() != "none"
+    ]

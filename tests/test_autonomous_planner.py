@@ -160,6 +160,8 @@ def test_run_agent_workflow_sensitivity_query_returns_sensitivity_report():
         "validate_sensitivity_file",
         "aggregate_greeks",
     ]
+    assert "none" not in result.orchestration_trace["executed_tools"]
+    assert result.orchestration_trace["skipped_or_unsupported_tools"] == []
     assert "Sensitivity Risk" in result.user_report
     assert "precomputed sensitivities" in result.user_report
     assert "does not calculate pricing-model Greeks" in result.user_report
@@ -1089,6 +1091,33 @@ def test_execution_trace_summary_keeps_executed_and_skipped_labels_on_separate_l
     output = capsys.readouterr().out
     assert "validate_report\n- Skipped / unsupported tools:" in output
     assert "validate_report- Skipped / unsupported tools" not in output
+
+
+def test_execution_trace_summary_filters_literal_none_from_tool_lists(capsys):
+    module = _load_demo_module()
+
+    module._print_execution_trace_summary(
+        {
+            "execution_mode": "approved_plan_executor",
+            "selected_route": "sensitivity",
+            "executed_tools": [
+                "load_sensitivity_file",
+                "validate_sensitivity_file",
+                "aggregate_greeks",
+                "none",
+            ],
+            "skipped_or_unsupported_tools": ["none"],
+        }
+    )
+
+    output = capsys.readouterr().out
+    executed_section = output.split("- Skipped / unsupported tools:", 1)[0]
+    skipped_section = output.split("- Skipped / unsupported tools:", 1)[1]
+    assert "  - load_sensitivity_file" in executed_section
+    assert "  - validate_sensitivity_file" in executed_section
+    assert "  - aggregate_greeks" in executed_section
+    assert "  - none" not in executed_section
+    assert "  - none" in skipped_section
 
 
 def test_primary_demo_llm_failure_does_not_display_stale_market_context(
